@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
@@ -7,6 +8,7 @@ from urllib.parse import parse_qs, urlparse
 from pydantic import ValidationError
 
 from scientific_brain.auth import require_user
+from scientific_brain.consent import UserConsentStore
 from scientific_brain.project_service import DefinedProjectService
 from scientific_brain.research_contracts import ResearchProjectDefinition
 from scientific_brain.user_snapshot import UserSnapshotStore
@@ -41,6 +43,9 @@ class handler(BaseHTTPRequestHandler):
         op = self._op()
         q = self._query()
         try:
+            if op == "consent":
+                self._write(200, UserConsentStore(user).status())
+                return
             if op == "folders":
                 self._write(200, {"folders": UserWorkspaceStore(user).list_folders()})
                 return
@@ -87,6 +92,53 @@ class handler(BaseHTTPRequestHandler):
         op = self._op()
         try:
             body = self._body()
+            if op == "consent":
+                result = UserConsentStore(user).accept(body, self.headers.get("User-Agent"))
+                self._write(201, result)
+                return
+            if op == "sync_context":
+                folder_id = str(body.get("folder_id") or "").strip()
+                if not folder_id:
+                    raise ValueError("folder_id is required")
+                workspace = UserWorkspaceStore(user)
+                folder = workspace.get_folder(folder_id)
+                if not folder:
+                    self._write(404, {"error": "folder_not_found"})
+                    return
+                papers = workspace.list_papers(folder_id)
+                paper_ids = [p["canonical_id"] for p in papers if p.get("canonical_id")]
+                corpus_hash = hashlib.sha256("\n".join(sorted(paper_ids)).encode("utf-8")).hexdigest()[:20]
+                session_id = body.get("session_id")
+                session_synced = False
+                if session_id:
+                    base_store = UserSnapshotStore(user)
+                    state = base_store.load_state(str(session_id))
+                    if state is None:
+                        self._write(404, {"error": "session_not_found"})
+                        return
+                    if state.folder_id != folder_id:
+                        self._write(409, {
+                            "error": "folder_context_mismatch",
+                            "detail": "The active session belongs to another research folder and was not modified.",
+                            "session_folder_id": state.folder_id,
+                            "requested_folder_id": folder_id,
+                        })
+                        return
+                    state.candidate_paper_ids = list(dict.fromkeys(paper_ids))
+                    state.selected_paper_ids = [x for x in state.selected_paper_ids if x in set(paper_ids)]
+                    scoped_store = UserSnapshotStore(user, folder_id=folder_id)
+                    scoped_store.save_state(state, project_id=state.project_id)
+                    session_synced = True
+                self._write(200, {
+                    "folder_id": folder_id,
+                    "folder_name": folder.get("name"),
+                    "paper_ids": paper_ids,
+                    "paper_count": len(paper_ids),
+                    "paper_target": folder.get("paper_target", 100),
+                    "corpus_hash": corpus_hash,
+                    "session_synced": session_synced,
+                })
+                return
             if op == "folders":
                 row = UserWorkspaceStore(user).create_folder(body)
                 self._write(201, {"folder": row})
@@ -99,7 +151,8 @@ class handler(BaseHTTPRequestHandler):
                 if not store.get_folder(folder_id):
                     self._write(404, {"error": "folder_not_found"})
                     return
-                self._write(201, {"paper": store.add_paper(folder_id, body)})
+                paper = store.add_paper(folder_id, body)
+                self._write(200 if paper.get("deduplicated") else 201, {"paper": paper})
                 return
             if op == "projects":
                 project_payload = body.get("project", body)
@@ -161,7 +214,15 @@ class handler(BaseHTTPRequestHandler):
                     raise ValueError("item_id is required")
                 self._write(200, {"paper": UserWorkspaceStore(user).update_paper(item_id, body)})
                 return
+            if op == "attach_pdf":
+                item_id = (q.get("item_id") or [""])[0]
+                if not item_id:
+                    raise ValueError("item_id is required")
+                self._write(200, {"paper": UserWorkspaceStore(user).attach_pdf(item_id, body)})
+                return
             self._write(404, {"error": "unknown_workspace_operation", "op": op})
+        except KeyError as exc:
+            self._write(404, {"error": str(exc).strip("'")})
         except (ValueError, json.JSONDecodeError) as exc:
             self._write(400, {"error": type(exc).__name__, "detail": str(exc)})
         except Exception as exc:
