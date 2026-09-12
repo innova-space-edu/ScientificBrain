@@ -3,11 +3,12 @@ from __future__ import annotations
 import json
 from http.server import BaseHTTPRequestHandler
 
+from scientific_brain.auth import require_user
 from scientific_brain.persistence import hydrate_memory_from_snapshot
 from scientific_brain.providers import provider_from_env
-from scientific_brain.security import require_authorized
 from scientific_brain.stage_stepper import StageStepper
-from scientific_brain.web_runtime import require_cloud_store, temporary_memory
+from scientific_brain.user_snapshot import UserSnapshotStore
+from scientific_brain.web_runtime import temporary_memory
 
 
 class handler(BaseHTTPRequestHandler):
@@ -21,7 +22,8 @@ class handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self):
-        if not require_authorized(self):
+        user = require_user(self)
+        if not user:
             return
         try:
             length = int(self.headers.get("Content-Length", "0"))
@@ -31,7 +33,12 @@ class handler(BaseHTTPRequestHandler):
             if not session_id or not artifact_type or "payload" not in payload:
                 self._write(400, {"error": "session_id, artifact_type and payload are required"})
                 return
-            store = require_cloud_store()
+            base_store = UserSnapshotStore(user)
+            state = base_store.load_state(session_id)
+            if state is None:
+                self._write(404, {"error": "session_not_found"})
+                return
+            store = UserSnapshotStore(user, folder_id=state.folder_id)
             provider = provider_from_env("cloud", task="research")
             with temporary_memory() as memory:
                 hydrate_memory_from_snapshot(memory, store, session_id)
