@@ -4,8 +4,8 @@ import json
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 
-from scientific_brain.security import require_authorized
-from scientific_brain.web_runtime import require_cloud_store
+from scientific_brain.auth import require_user
+from scientific_brain.user_snapshot import UserSnapshotStore
 
 
 class handler(BaseHTTPRequestHandler):
@@ -19,7 +19,8 @@ class handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
-        if not require_authorized(self):
+        user = require_user(self)
+        if not user:
             return
         try:
             query = parse_qs(urlparse(self.path).query)
@@ -27,7 +28,7 @@ class handler(BaseHTTPRequestHandler):
             if not session_id:
                 self._write(400, {"error": "session_id is required"})
                 return
-            store = require_cloud_store()
+            store = UserSnapshotStore(user)
             state = store.load_state(session_id)
             if state is None:
                 self._write(404, {"error": "session_not_found"})
