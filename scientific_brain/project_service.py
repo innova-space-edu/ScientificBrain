@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .memory import ScientificMemory
+from .models import AuditEvent, ResearchStage
 from .persistence import SnapshotStore
 from .project_store import ProjectDefinitionStore
 from .research_contracts import ResearchProjectDefinition, definition_gate
@@ -38,14 +39,12 @@ class DefinedProjectService:
             search_query=search_query,
             limit=limit,
         )
+        state.project_id = project.project_id
+        state.protocol_stage = "definition"
+        state.stage = ResearchStage.DEFINITION
         state.gate_results.append(gate)
         state.audit_log.append(
-            state.audit_log[0].model_copy(
-                update={
-                    "event": "project_definition_attached",
-                    "detail": project.project_id,
-                }
-            )
+            AuditEvent(event="project_definition_attached", detail=project.project_id)
         )
         self.memory.record_gate(gate, session_id=state.session_id)
         self.memory.save_state(state)
