@@ -6,6 +6,7 @@ from typing import Any, Protocol
 
 import httpx
 
+from .artifacts import ArtifactRecord
 from .models import ResearchState
 from .research_contracts import ResearchProjectDefinition
 
@@ -13,6 +14,7 @@ from .research_contracts import ResearchProjectDefinition
 class SnapshotStore(Protocol):
     def save_project(self, project: ResearchProjectDefinition) -> None: ...
     def save_state(self, state: ResearchState, project_id: str | None = None) -> None: ...
+    def save_artifact(self, artifact: ArtifactRecord) -> None: ...
     def load_state(self, session_id: str) -> ResearchState | None: ...
     def status(self) -> dict[str, Any]: ...
 
@@ -55,10 +57,24 @@ class SupabaseSnapshotStore:
             headers=self.headers,
             json={
                 "session_id": state.session_id,
-                "project_id": project_id,
+                "project_id": project_id or state.project_id,
                 "question": state.question,
                 "stage": state.stage.value,
                 "state": state.model_dump(mode="json"),
+            },
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+
+    def save_artifact(self, artifact: ArtifactRecord) -> None:
+        response = httpx.post(
+            self._endpoint("scibrain_artifacts"),
+            headers=self.headers,
+            json={
+                "artifact_id": artifact.artifact_id,
+                "session_id": artifact.session_id,
+                "artifact_type": artifact.artifact_type,
+                "payload": artifact.model_dump(mode="json"),
             },
             timeout=self.timeout,
         )
