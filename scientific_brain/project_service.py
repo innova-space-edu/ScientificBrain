@@ -49,7 +49,7 @@ class DefinedProjectService:
         )
 
         artifact_store = LocalArtifactStore(self.memory)
-        artifact_store.save(ArtifactRecord(
+        project_artifact = ArtifactRecord(
             artifact_id=f"{state.session_id}:project_definition:r1",
             session_id=state.session_id,
             artifact_type="project_definition",
@@ -58,7 +58,10 @@ class DefinedProjectService:
             payload=project.model_dump(mode="json"),
             revision=1,
             accepted=True,
-        ))
+        )
+        artifact_store.save(project_artifact)
+        if self.snapshot_store:
+            self.snapshot_store.save_artifact(project_artifact)
 
         self.memory.record_gate(gate, session_id=state.session_id)
         self.memory.save_state(state)
