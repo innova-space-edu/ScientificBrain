@@ -4,7 +4,7 @@ import os
 from dataclasses import dataclass
 
 from .discovery import OpenAlexClient
-from .fulltext import ingest_open_access_paper
+from .fulltext import extract_pdf_bytes, fetch_pdf, ingest_open_access_paper
 from .memory import ScientificMemory
 from .models import Paper, ReviewDepth
 from .persistence import SnapshotStore
@@ -45,12 +45,16 @@ class CloudPaperService:
         self.memory.upsert_paper(paper)
         return paper
 
-    def review_open_access_paper(self, paper_id: str):
+    def review_paper(self, paper_id: str, *, pdf_url: str | None = None):
         paper = self.memory.get_paper(paper_id) or self.load_cloud_paper(paper_id)
-        document = ingest_open_access_paper(
-            paper,
-            unpaywall_email=os.getenv("UNPAYWALL_EMAIL"),
-        )
+        if pdf_url:
+            data = fetch_pdf(pdf_url)
+            document = extract_pdf_bytes(paper.canonical_id, pdf_url, data)
+        else:
+            document = ingest_open_access_paper(
+                paper,
+                unpaywall_email=os.getenv("UNPAYWALL_EMAIL"),
+            )
         result = ScientificWorkflow(self.memory, self.provider).review_paper(
             paper_id,
             document.text,
@@ -65,3 +69,6 @@ class CloudPaperService:
             result.specialist_reviews,
         )
         return result, document
+
+    def review_open_access_paper(self, paper_id: str):
+        return self.review_paper(paper_id)
