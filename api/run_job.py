@@ -3,10 +3,11 @@ from __future__ import annotations
 import json
 from http.server import BaseHTTPRequestHandler
 
+from scientific_brain.auth import require_user
 from scientific_brain.jobs import ScientificJobProcessor
 from scientific_brain.providers import provider_from_env
-from scientific_brain.security import require_authorized
-from scientific_brain.web_runtime import require_cloud_store, temporary_memory
+from scientific_brain.user_snapshot import UserSnapshotStore
+from scientific_brain.web_runtime import temporary_memory
 
 
 class handler(BaseHTTPRequestHandler):
@@ -20,7 +21,8 @@ class handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self):
-        if not require_authorized(self):
+        user = require_user(self)
+        if not user:
             return
         try:
             length = int(self.headers.get("Content-Length", "0"))
@@ -29,7 +31,16 @@ class handler(BaseHTTPRequestHandler):
             if not job_id:
                 self._write(400, {"error": "job_id is required"})
                 return
-            store = require_cloud_store()
+            base_store = UserSnapshotStore(user)
+            job = base_store.get_job(job_id)
+            if job is None:
+                self._write(404, {"error": "job_not_found"})
+                return
+            state = base_store.load_state(job["session_id"])
+            if state is None:
+                self._write(404, {"error": "session_not_found"})
+                return
+            store = UserSnapshotStore(user, folder_id=state.folder_id)
             provider = provider_from_env("cloud", task="research")
             with temporary_memory() as memory:
                 result = ScientificJobProcessor(memory, provider, store).run(job_id)
