@@ -1,0 +1,53 @@
+target_papers: 100
+
+# The 100-paper corpus is the minimum analysis set for ScientificBrain v0.
+# Discovery may retrieve thousands of records; selection reduces them to 100
+# high-value, non-duplicate papers for deep extraction and critique.
+
+method_mix:
+  experimental: 30
+  theoretical: 20
+  simulation: 25
+  review: 15
+  hybrid: 10
+
+time_mix:
+  foundational_pre_2015: 20
+  consolidation_2015_2023: 35
+  recent_2024_plus: 45
+
+# Domain targets are soft quotas. A paper may cover more than one domain.
+domain_targets:
+  fundamental_kinetic: 8
+  mhd: 8
+  gyrokinetics: 7
+  magnetic_reconnection: 8
+  turbulence_transport: 10
+  magnetic_confinement: 8
+  space_solar: 7
+  laser_plasma: 7
+  high_energy_density: 6
+  low_temperature: 6
+  dusty_plasma: 3
+  propulsion: 6
+  diagnostics: 6
+  numerical_methods: 6
+  machine_learning: 4
+
+selection_weights:
+  topical_relevance: 0.35
+  scientific_influence: 0.20
+  methodological_value: 0.20
+  recency: 0.15
+  open_access_or_full_text: 0.10
+
+requirements:
+  stable_identifier_required: true
+  deduplicate_by: [doi, arxiv_id, openalex_id]
+  preserve_provenance: true
+  minimum_recent_papers_2024_plus: 40
+  minimum_reviews_or_roadmaps: 10
+  minimum_experimental: 25
+  minimum_simulation: 20
+  minimum_theoretical: 15
+  deep_analysis_count: 100
