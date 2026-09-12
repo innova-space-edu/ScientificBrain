@@ -4,6 +4,7 @@ import json
 from http.server import BaseHTTPRequestHandler
 
 from scientific_brain import __version__
+from scientific_brain.auth import supabase_public_config
 from scientific_brain.persistence import persistence_status
 from scientific_brain.providers import provider_configuration_summary
 from scientific_brain.registry import scientific_manifest
@@ -14,6 +15,7 @@ class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         manifest = scientific_manifest()
         security = security_status()
+        supabase = supabase_public_config()
         payload = {
             "service": "ScientificBrain",
             "version": __version__,
@@ -24,10 +26,17 @@ class handler(BaseHTTPRequestHandler):
                 "hard_rules": len(manifest["hard_rules"]),
             },
             "persistence": persistence_status(),
+            "auth": {
+                "provider": "supabase",
+                "url_configured": bool(supabase.get("url")),
+                "publishable_key_configured": bool(supabase.get("publishable_key")),
+                "row_level_security": True,
+                "workspace_isolation": "owner_id = auth.uid()",
+            },
             "security": {
-                "api_token_required": security.token_required,
-                "api_token_configured": security.token_configured,
-                "public_mutations_protected": security.secure_for_public_mutations,
+                "legacy_api_token_required": security.token_required,
+                "legacy_api_token_configured": security.token_configured,
+                "primary_user_security": "Supabase Auth + RLS",
             },
             **provider_configuration_summary("research"),
         }
