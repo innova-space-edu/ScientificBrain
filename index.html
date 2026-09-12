@@ -5,16 +5,40 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>ScientificBrain</title>
   <link rel="stylesheet" href="/assets/styles.css" />
+  <link rel="stylesheet" href="/assets/workspace.css" />
 </head>
 <body>
+  <div id="auth-gate" class="auth-gate">
+    <div class="auth-card">
+      <div class="brand" style="color:#101828;padding:0 0 8px"><div class="mark">SB</div><div><strong>ScientificBrain</strong><span>Personal scientific workspace</span></div></div>
+      <h2>Research account</h2>
+      <p class="muted">Each account has isolated folders, projects, papers, sessions and scientific memory.</p>
+      <div class="auth-tabs"><button id="auth-tab-signin" class="primary">Sign in</button><button id="auth-tab-signup" class="ghost">Create account</button></div>
+      <div id="auth-signin" class="auth-pane active">
+        <label>Email<input id="signin-email" type="email" autocomplete="email" /></label>
+        <label>Password<input id="signin-password" type="password" autocomplete="current-password" /></label>
+        <button id="signin-button" class="primary">Sign in</button>
+      </div>
+      <div id="auth-signup" class="auth-pane">
+        <label>Name<input id="signup-name" autocomplete="name" /></label>
+        <label>Email<input id="signup-email" type="email" autocomplete="email" /></label>
+        <label>Password<input id="signup-password" type="password" autocomplete="new-password" /></label>
+        <button id="signup-button" class="primary">Create account</button>
+      </div>
+      <div id="auth-message" class="auth-message"></div>
+    </div>
+  </div>
+
   <div class="shell">
     <aside class="sidebar">
       <div class="brand"><div class="mark">SB</div><div><strong>ScientificBrain</strong><span>Research OS</span></div></div>
-      <nav>
+      <div class="user-box" id="user-box"><strong>Not signed in</strong><span>Supabase Auth</span></div>
+      <nav style="margin-top:16px">
         <button class="nav active" data-view="overview">Overview</button>
+        <button class="nav" data-view="workspace">Workspace</button>
         <button class="nav" data-view="definition">Project definition</button>
         <button class="nav" data-view="session">Research session</button>
-        <button class="nav" data-view="literature">Literature corpus</button>
+        <button class="nav" data-view="literature">Research Agent</button>
         <button class="nav" data-view="protocol">Protocol</button>
         <button class="nav" data-view="projects">Projects</button>
       </nav>
@@ -22,14 +46,14 @@
         <div class="mini"><span id="provider-dot" class="dot"></span><span id="provider-label">Checking inference…</span></div>
         <div class="mini"><span id="storage-dot" class="dot"></span><span id="storage-label">Checking storage…</span></div>
         <div class="mini"><span id="security-dot" class="dot"></span><span id="security-label">Checking security…</span></div>
-        <button id="set-access-token" class="sidebar-button">Set access token</button>
+        <button id="signout-button" class="sidebar-button">Sign out</button>
       </div>
     </aside>
 
     <main class="main">
       <header class="topbar">
         <div><p class="eyebrow">Evidence-grounded scientific reasoning</p><h1 id="page-title">Overview</h1></div>
-        <div class="top-actions"><span class="badge" id="version-badge">v—</span><span class="badge accent" id="stage-badge">No active session</span></div>
+        <div class="top-actions"><span class="badge" id="version-badge">v—</span><span class="badge" id="active-folder-badge">No folder selected</span><span class="badge accent" id="stage-badge">No active session</span></div>
       </header>
 
       <section id="view-overview" class="view active">
@@ -37,19 +61,56 @@
           <article class="card metric"><span>Scientific agents</span><strong id="metric-agents">—</strong><small>defined roles</small></article>
           <article class="card metric"><span>Protocol stages</span><strong id="metric-stages">—</strong><small>gated progression</small></article>
           <article class="card metric"><span>Hard rules</span><strong id="metric-rules">—</strong><small>non-negotiable</small></article>
-          <article class="card metric"><span>Corpus target</span><strong>100</strong><small>deep-reviewed papers</small></article>
+          <article class="card metric"><span>Folder corpus</span><strong id="metric-folder-papers">0</strong><small id="metric-folder-target">target 100</small></article>
         </div>
+        <div id="overview-folder-context" class="folder-context">Select a research folder. All subsequent literature, projects and agents will work only inside that folder.</div>
         <div class="grid two">
-          <article class="card"><div class="card-head"><h2>Inference router</h2><span class="pill">cloud first</span></div><div id="provider-order" class="chips"></div><p class="muted">Models are replaceable. Scientific state, evidence and project definitions remain provider-independent.</p></article>
+          <article class="card"><div class="card-head"><h2>Inference router</h2><span class="pill">cloud first</span></div><div id="provider-order" class="chips"></div><p class="muted">Models are replaceable. Scientific state, evidence and user-owned memory remain provider-independent.</p></article>
           <article class="card"><div class="card-head"><h2>Scientific invariants</h2></div><ul id="hard-rules" class="rule-list"></ul></article>
         </div>
         <article class="card"><div class="card-head"><h2>Current protocol</h2><button class="ghost" data-jump="protocol">Open protocol</button></div><div id="overview-protocol" class="timeline"></div></article>
       </section>
 
+      <section id="view-workspace" class="view">
+        <div class="grid workspace-grid">
+          <article class="card">
+            <div class="card-head"><div><h2>Research folders</h2><p class="muted">Organize by year, research line, area or any hierarchy you define.</p></div><button id="refresh-folders" class="ghost">Refresh</button></div>
+            <label>Folder name<input id="folder-name" placeholder="PF-PPT CubeSat" /></label>
+            <div class="row"><label>Year<input id="folder-year" type="number" placeholder="2027" /></label><label>Paper target<input id="folder-target" type="number" value="100" min="1" /></label></div>
+            <label>Research line<input id="folder-line" placeholder="Plasma propulsion" /></label>
+            <label>Area<input id="folder-area" placeholder="Plasma physics" /></label>
+            <label>Parent folder<select id="folder-parent"><option value="">Root</option></select></label>
+            <button id="create-folder" class="primary">Create folder</button>
+            <hr />
+            <div id="folder-list" class="folder-list empty">No folders loaded.</div>
+          </article>
+
+          <div class="grid">
+            <article class="card">
+              <div class="library-head"><div><h2 id="selected-folder-title">Select a folder</h2><p id="selected-folder-meta" class="muted">A folder defines the active scientific context.</p></div><div class="row"><button id="rename-folder" class="ghost" disabled>Rename</button><button id="edit-folder" class="ghost" disabled>Edit metadata</button></div></div>
+              <div class="paper-progress"><span id="paper-progress-bar"></span></div>
+              <p id="paper-progress-label" class="muted">0 / 100 papers</p>
+            </article>
+
+            <article class="card">
+              <div class="card-head"><div><h2>Upload papers</h2><p class="muted">Private PDFs are stored under your Supabase user ID and selected folder.</p></div><span class="pill">PDF · 100 MB max</span></div>
+              <div class="upload-drop"><input id="paper-files" type="file" accept="application/pdf" multiple /><p class="muted">You may upload your own corpus. The target is configurable; 100 is the default, not a hard global limit.</p></div>
+              <button id="upload-papers" class="primary" disabled style="margin-top:12px">Upload selected PDFs</button>
+            </article>
+
+            <article class="card">
+              <div class="card-head"><div><h2>Folder paper library</h2><p class="muted">Only these sources are injected into projects and agents when this folder is active.</p></div><span id="library-count" class="pill">0</span></div>
+              <div id="paper-list" class="paper-table empty">No papers in this folder.</div>
+            </article>
+          </div>
+        </div>
+      </section>
+
       <section id="view-definition" class="view">
+        <div id="definition-folder-context" class="folder-context">Select a research folder before creating a project.</div>
         <div class="grid definition-grid">
           <article class="card editor-card">
-            <div class="card-head"><div><h2>Canonical project definition</h2><p class="muted">This object cannot be silently rewritten by agents.</p></div><div class="row"><button id="load-template" class="ghost">Load template</button><button id="validate-project" class="secondary">Validate</button><button id="create-project" class="primary">Create project</button></div></div>
+            <div class="card-head"><div><h2>Canonical project definition</h2><p class="muted">This object cannot be silently rewritten by agents. The project will inherit only the selected folder corpus.</p></div><div class="row"><button id="load-template" class="ghost">Load template</button><button id="validate-project" class="secondary">Validate</button><button id="create-project" class="primary">Create project</button></div></div>
             <textarea id="project-json" spellcheck="false" aria-label="Research project JSON"></textarea>
           </article>
           <aside class="card inspector"><h2>Definition gate</h2><div id="validation-status" class="status-box neutral">Not validated</div><div id="validation-details" class="stack small"></div><hr/><h3>Required definition</h3><ul class="check-list"><li>Scientific question + gap</li><li>Objectives + observables</li><li>Variables + operational definitions</li><li>Falsifiable hypotheses</li><li>Rejection criteria</li><li>Model/experiment/simulation definitions</li><li>Uncertainty</li><li>In-scope / out-of-scope</li><li>Required outputs</li></ul></aside>
@@ -69,22 +130,25 @@
       </section>
 
       <section id="view-literature" class="view">
+        <div id="research-folder-context" class="folder-context">Select a research folder. Research Agent results can then be added directly to that folder.</div>
         <div class="grid two">
           <article class="card">
-            <div class="card-head"><div><h2>Literature discovery</h2><p class="muted">Metadata discovery does not count as deep review.</p></div><span class="pill">OpenAlex</span></div>
-            <label>Scientific query<input id="literature-query" placeholder="magnetized plasma shocks Hall MHD experiment"/></label>
-            <div class="row"><label>From year<input id="literature-year" type="number" value="1990"/></label><label>Max records<input id="literature-max" type="number" value="100" min="1" max="200"/></label></div>
-            <button id="enqueue-discovery" class="primary" disabled>Queue discovery</button>
+            <div class="card-head"><div><h2>Research Agent</h2><p class="muted">Search scientific databases and, when configured, the general web.</p></div><span class="pill">OpenAlex · arXiv · Crossref · Web</span></div>
+            <label>Scientific query<input id="research-query" placeholder="magnetized plasma shocks Hall MHD experiment"/></label>
+            <div class="row"><label>From year<input id="research-year" type="number" value="1990"/></label><label>Max results<input id="research-max" type="number" value="40" min="1" max="100"/></label></div>
+            <button id="research-search" class="primary" disabled>Search information</button>
+            <p class="muted">If a full text cannot be downloaded automatically, ScientificBrain preserves the DOI and source link so you can retrieve and upload it manually.</p>
           </article>
           <article class="card">
-            <div class="card-head"><div><h2>Deep-review corpus</h2><p class="muted">Each selected paper requires full text, structured extraction, specialist criticism and gates.</p></div><span class="pill">target 100</span></div>
-            <p class="muted">Queue up to 100 selected/candidate papers as individual review jobs. Each job runs separately to remain compatible with serverless execution limits.</p>
+            <div class="card-head"><div><h2>Deep-review jobs</h2><p class="muted">Full-text review is executed paper by paper through the selected folder.</p></div><span class="pill">target 100</span></div>
             <button id="enqueue-reviews" class="secondary" disabled>Queue selected paper reviews</button>
+            <button id="refresh-jobs" class="ghost" style="margin-left:8px">Refresh jobs</button>
+            <div id="jobs-list" class="jobs-list empty" style="margin-top:14px">No jobs loaded.</div>
           </article>
         </div>
         <article class="card">
-          <div class="card-head"><div><h2>Literature jobs</h2><p class="muted">Run jobs incrementally. Failed jobs preserve the exact error instead of being counted as reviewed.</p></div><button id="refresh-jobs" class="secondary">Refresh</button></div>
-          <div id="jobs-list" class="jobs-list empty">No jobs loaded.</div>
+          <div class="card-head"><div><h2>Search results</h2><p id="research-source-summary" class="muted">No search performed.</p></div></div>
+          <div id="research-results" class="result-list empty">Search results will appear here.</div>
         </article>
       </section>
 
@@ -94,7 +158,8 @@
       </section>
 
       <section id="view-projects" class="view">
-        <article class="card"><div class="card-head"><div><h2>Persistent projects</h2><p class="muted">Requires Supabase production storage.</p></div><button id="refresh-projects" class="secondary">Refresh</button></div><div id="projects-list" class="projects-table empty">No projects loaded.</div></article>
+        <div id="projects-folder-context" class="folder-context">Projects are filtered to the selected research folder.</div>
+        <article class="card"><div class="card-head"><div><h2>Persistent projects</h2><p class="muted">Supabase RLS isolates each user's projects.</p></div><button id="refresh-projects" class="secondary">Refresh</button></div><div id="projects-list" class="projects-table empty">No projects loaded.</div></article>
       </section>
     </main>
   </div>
