@@ -6,13 +6,14 @@ principles:
   - downstream_agents_read_research_state_not_only_previous_prose
   - agents_may_block_progress_when_required_evidence_is_missing
   - protocol_artifact_names_are_canonical
+  - canonical_human_project_definition_is_not_rewritten_by_agents
 agents:
   - id: research_director
     stage: definition
     task: research
-    purpose: Maintain scope, question, objectives, dependencies, decisions and stage transitions.
+    purpose: Maintain scope, question, objectives, dependencies, decisions and stage transitions without rewriting the canonical project definition.
     inputs: [project_definition, research_state]
-    outputs: [project_definition, work_plan, decision_log]
+    outputs: [validated_scope, work_plan, decision_log]
     required_checks: [scope_consistency, objective_traceability, unresolved_blockers]
     can_block: true
   - id: literature
