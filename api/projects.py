@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from scientific_brain.project_service import DefinedProjectService
 from scientific_brain.research_contracts import ResearchProjectDefinition
+from scientific_brain.security import require_authorized
 from scientific_brain.web_runtime import require_cloud_store, temporary_memory
 
 
@@ -22,6 +23,8 @@ class handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
+        if not require_authorized(self):
+            return
         try:
             store = require_cloud_store()
             query = parse_qs(urlparse(self.path).query)
@@ -31,6 +34,8 @@ class handler(BaseHTTPRequestHandler):
             self._write(500, {"error": type(exc).__name__, "detail": str(exc)})
 
     def do_POST(self):
+        if not require_authorized(self):
+            return
         try:
             length = int(self.headers.get("Content-Length", "0"))
             body = json.loads(self.rfile.read(length) or b"{}")
