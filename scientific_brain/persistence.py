@@ -32,6 +32,7 @@ class SnapshotStore(Protocol):
     def load_paper_bundles(self, paper_ids: list[str]) -> list[dict[str, Any]]: ...
     def create_job(self, session_id: str, job_type: str, payload: dict[str, Any]) -> dict[str, Any]: ...
     def get_job(self, job_id: str) -> dict[str, Any] | None: ...
+    def list_jobs(self, session_id: str | None = None, limit: int = 100) -> list[dict[str, Any]]: ...
     def update_job(self, job_id: str, **updates: Any) -> None: ...
     def status(self) -> dict[str, Any]: ...
 
@@ -191,6 +192,16 @@ class SupabaseSnapshotStore:
             {"job_id": f"eq.{job_id}", "select": "*", "limit": "1"},
         )
         return rows[0] if rows else None
+
+    def list_jobs(self, session_id: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
+        params = {
+            "select": "*",
+            "order": "created_at.desc",
+            "limit": str(max(1, min(limit, 500))),
+        }
+        if session_id:
+            params["session_id"] = f"eq.{session_id}"
+        return self._select("scibrain_jobs", params)
 
     def update_job(self, job_id: str, **updates: Any) -> None:
         allowed = {"status", "progress", "last_error", "payload"}
