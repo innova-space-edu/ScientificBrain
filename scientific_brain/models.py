@@ -30,16 +30,28 @@ class ReviewDepth(StrEnum):
 
 
 class ResearchStage(StrEnum):
-    INGESTION = "ingestion"
+    # Explicit scientific protocol stages.
+    DEFINITION = "definition"
+    LITERATURE = "literature"
+    THEORY = "theory"
+    HYPOTHESIS = "hypothesis"
+    DESIGN = "design"
+    EXECUTION = "execution"
     ANALYSIS = "analysis"
+    INTERPRETATION = "interpretation"
+    CRITICISM = "criticism"
+    REPRODUCIBILITY = "reproducibility"
+    WRITING = "writing"
+    REVIEW = "review"
+
+    # Legacy/internal workflow stages retained for compatibility with the v0.3 paper-synthesis path.
+    INGESTION = "ingestion"
     CRITIQUE = "critique"
     EVIDENCE_GATE = "evidence_gate"
     SYNTHESIS = "synthesis"
     ALTERNATIVES = "alternatives"
     ADVERSARIAL = "adversarial"
-    REPRODUCIBILITY = "reproducibility"
-    WRITING = "writing"
-    REVIEW = "review"
+
     COMPLETE = "complete"
     BLOCKED = "blocked"
 
@@ -185,7 +197,10 @@ class AuditEvent(BaseModel):
 class ResearchState(BaseModel):
     session_id: str
     question: str
+    project_id: str | None = None
     stage: ResearchStage = ResearchStage.INGESTION
+    protocol_stage: str = "definition"
+    blocked_stage: str | None = None
     candidate_paper_ids: list[str] = Field(default_factory=list)
     selected_paper_ids: list[str] = Field(default_factory=list)
     hypotheses: list[ResearchHypothesis] = Field(default_factory=list)
