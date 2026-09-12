@@ -2,7 +2,9 @@ name: ScientificBrain tests
 
 on:
   push:
-    branches: [main, feat/scientific-brain-v0]
+    branches:
+      - main
+      - 'feat/**'
   pull_request:
     branches: [main]
 
