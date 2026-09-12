@@ -1,0 +1,58 @@
+# Curated anchors verified against publisher/institutional records. Discovery expands beyond these seeds.
+papers:
+  - title: "Foundations of nonlinear gyrokinetic theory"
+    year: 2007
+    doi: "10.1103/RevModPhys.79.421"
+    tags: [gyrokinetics, theory, turbulence]
+  - title: "Magnetic reconnection"
+    year: 2010
+    doi: "10.1103/RevModPhys.82.603"
+    tags: [reconnection, experiment, theory, simulation]
+  - title: "Contemporary particle-in-cell approach to laser-plasma modelling"
+    year: 2015
+    doi: "10.1088/0741-3335/57/11/113001"
+    tags: [pic, laser_plasma, simulation]
+  - title: "The 2022 Plasma Roadmap: low temperature plasma science and technology"
+    year: 2022
+    doi: "10.1088/1361-6463/ac5e1c"
+    tags: [low_temperature, roadmap, experiment, modeling]
+  - title: "Magnetic reconnection: MHD theory and modelling"
+    year: 2022
+    doi: "10.1007/s41116-022-00032-9"
+    tags: [reconnection, mhd, theory, simulation]
+  - title: "Observations of cross scale energy transfer in the inner heliosphere by Parker Solar Probe"
+    year: 2022
+    doi: "10.1007/s41614-022-00097-x"
+    tags: [space_solar, turbulence, experiment]
+  - title: "Self-organization of photoionized plasmas via kinetic instabilities"
+    year: 2023
+    doi: "10.1007/s41614-023-00135-2"
+    tags: [kinetic, laser_plasma, experiment, theory]
+  - title: "Global fluid simulations of edge plasma turbulence in tokamaks: a review"
+    year: 2024
+    doi: "10.1016/j.compfluid.2023.106141"
+    tags: [tokamak, turbulence, simulation, review]
+  - title: "Quasilinear theory and modelling of gyrokinetic turbulent transport in tokamaks"
+    year: 2024
+    doi: "10.1088/1741-4326/ad6ba5"
+    tags: [gyrokinetics, tokamak, turbulence, theory]
+  - title: "Non-linear MHD modelling of transients in tokamaks: a review of recent advances with the JOREK code"
+    year: 2024
+    doi: "10.1088/1741-4326/ad5a21"
+    tags: [mhd, tokamak, simulation, jorek]
+  - title: "Turbulence and transport by electron temperature gradient driven instability in large volume plasma device"
+    year: 2024
+    doi: "10.1007/s41614-024-00163-6"
+    tags: [turbulence, experiment, theory]
+  - title: "Bright X/gamma-ray emission and lepton pair production by strong laser fields: a review"
+    year: 2024
+    doi: "10.1007/s41614-024-00158-3"
+    tags: [laser_plasma, high_energy_density, review]
+  - title: "How turbulence sets boundaries for tokamak operation"
+    year: 2024
+    doi: "10.1007/s41614-024-00178-z"
+    tags: [tokamak, turbulence, transport, review]
+  - title: "Leveraging turbulence data from fusion experiments"
+    year: 2025
+    doi: "10.1007/s41614-025-00198-3"
+    tags: [fusion, turbulence, diagnostics, machine_learning]

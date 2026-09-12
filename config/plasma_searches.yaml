@@ -1,0 +1,26 @@
+# Re-run periodically. Queries are intentionally overlapping; canonical IDs deduplicate results.
+searches:
+  - {id: kinetic_vlasov, query: "plasma Vlasov kinetic Landau damping phase space", from_year: 2000}
+  - {id: kinetic_instabilities, query: "plasma kinetic instabilities two-stream Weibel filamentation", from_year: 2000}
+  - {id: mhd, query: "plasma magnetohydrodynamics resistive MHD Hall MHD extended MHD", from_year: 2000}
+  - {id: reconnection, query: "magnetic reconnection plasma current sheet tearing plasmoid", from_year: 2000}
+  - {id: gyrokinetics, query: "gyrokinetic plasma turbulence transport tokamak stellarator", from_year: 2000}
+  - {id: fusion_turbulence, query: "tokamak plasma turbulence transport edge pedestal divertor", from_year: 2000}
+  - {id: stellarator, query: "stellarator plasma confinement neoclassical turbulence", from_year: 2000}
+  - {id: space_turbulence, query: "solar wind space plasma turbulence kinetic cascade", from_year: 2000}
+  - {id: magnetosphere, query: "magnetospheric plasma reconnection turbulence waves", from_year: 2000}
+  - {id: laser_plasma, query: "laser plasma interaction relativistic wakefield acceleration", from_year: 2000}
+  - {id: hed_icf, query: "high energy density plasma inertial confinement fusion warm dense matter", from_year: 2000}
+  - {id: low_temperature, query: "low temperature non-equilibrium plasma discharge diagnostics modeling", from_year: 2000}
+  - {id: dusty, query: "dusty complex plasma experiment theory simulation", from_year: 2000}
+  - {id: propulsion, query: "electric plasma propulsion Hall thruster ion thruster pulsed plasma thruster", from_year: 2000}
+  - {id: diagnostics_thomson, query: "plasma diagnostics Thomson scattering spectroscopy interferometry", from_year: 2000}
+  - {id: diagnostics_probes, query: "Langmuir probe plasma diagnostics magnetic probes calibration", from_year: 2000}
+  - {id: pic, query: "particle-in-cell plasma simulation PIC verification validation", from_year: 2000}
+  - {id: fluid_numerics, query: "plasma fluid simulation finite volume finite element discontinuous Galerkin", from_year: 2000}
+  - {id: codes_fusion, query: "GENE GS2 GYRO XGC BOUT JOREK NIMROD M3D-C1 plasma", from_year: 2000}
+  - {id: codes_kinetic, query: "WarpX OSIRIS VPIC EPOCH Gkeyll plasma simulation", from_year: 2000}
+  - {id: machine_learning, query: "machine learning plasma physics physics-informed neural network surrogate", from_year: 2015}
+  - {id: uncertainty_uq, query: "plasma simulation uncertainty quantification verification validation", from_year: 2010}
+  - {id: reviews_roadmaps, query: "plasma physics review roadmap experiment theory simulation", from_year: 2015}
+  - {id: recent_frontier, query: "plasma physics experiment theory simulation", from_year: 2024}
