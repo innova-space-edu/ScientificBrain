@@ -5,6 +5,7 @@ from http.server import BaseHTTPRequestHandler
 
 from scientific_brain.persistence import hydrate_memory_from_snapshot
 from scientific_brain.providers import provider_from_env
+from scientific_brain.security import require_authorized
 from scientific_brain.stage_stepper import StageStepper
 from scientific_brain.web_runtime import require_cloud_store, temporary_memory
 
@@ -20,6 +21,8 @@ class handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self):
+        if not require_authorized(self):
+            return
         try:
             length = int(self.headers.get("Content-Length", "0"))
             payload = json.loads(self.rfile.read(length) or b"{}")
