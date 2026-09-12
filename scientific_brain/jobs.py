@@ -102,7 +102,10 @@ class ScientificJobProcessor:
             raise ValueError("review_paper job requires payload.paper_id")
 
         service = CloudPaperService(self.memory, self.provider, self.snapshot_store)
-        result, document = service.review_open_access_paper(str(paper_id))
+        result, document = service.review_paper(
+            str(paper_id),
+            pdf_url=payload.get("pdf_url"),
+        )
         if paper_id not in state.selected_paper_ids:
             state.selected_paper_ids.append(str(paper_id))
         state.audit_log.append(AuditEvent(
