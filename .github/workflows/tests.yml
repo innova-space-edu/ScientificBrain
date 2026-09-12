@@ -19,5 +19,7 @@ jobs:
           cache: pip
       - name: Install
         run: pip install -e ".[dev]"
-      - name: Test
+      - name: Python tests
         run: pytest -q
+      - name: Frontend JavaScript syntax
+        run: node --check assets/app.js
