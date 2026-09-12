@@ -4,9 +4,9 @@ import json
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 
+from scientific_brain.auth import require_user
 from scientific_brain.jobs import SUPPORTED_JOB_TYPES
-from scientific_brain.security import require_authorized
-from scientific_brain.web_runtime import require_cloud_store
+from scientific_brain.user_snapshot import UserSnapshotStore
 
 
 class handler(BaseHTTPRequestHandler):
@@ -20,19 +20,21 @@ class handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
-        if not require_authorized(self):
+        user = require_user(self)
+        if not user:
             return
         try:
             query = parse_qs(urlparse(self.path).query)
             session_id = (query.get("session_id") or [None])[0]
             limit = int((query.get("limit") or ["100"])[0])
-            store = require_cloud_store()
+            store = UserSnapshotStore(user)
             self._write(200, {"jobs": store.list_jobs(session_id=session_id, limit=limit)})
         except Exception as exc:
             self._write(500, {"error": type(exc).__name__, "detail": str(exc)})
 
     def do_POST(self):
-        if not require_authorized(self):
+        user = require_user(self)
+        if not user:
             return
         try:
             length = int(self.headers.get("Content-Length", "0"))
@@ -45,7 +47,12 @@ class handler(BaseHTTPRequestHandler):
             if job_type not in SUPPORTED_JOB_TYPES:
                 self._write(400, {"error": "unsupported_job_type", "supported": sorted(SUPPORTED_JOB_TYPES)})
                 return
-            store = require_cloud_store()
+            base_store = UserSnapshotStore(user)
+            state = base_store.load_state(session_id)
+            if state is None:
+                self._write(404, {"error": "session_not_found"})
+                return
+            store = UserSnapshotStore(user, folder_id=state.folder_id)
             job = store.create_job(session_id, job_type, payload.get("payload") or {})
             self._write(201, job)
         except (ValueError, json.JSONDecodeError) as exc:
