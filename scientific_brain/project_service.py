@@ -24,6 +24,8 @@ class DefinedProjectService:
         paper_ids: list[str] | None = None,
         search_query: str | None = None,
         limit: int = 20,
+        owner_id: str | None = None,
+        folder_id: str | None = None,
     ):
         gate = definition_gate(project)
         if not gate.passed:
@@ -40,6 +42,8 @@ class DefinedProjectService:
             search_query=search_query,
             limit=limit,
         )
+        state.owner_id = owner_id
+        state.folder_id = folder_id
         state.project_id = project.project_id
         state.protocol_stage = "definition"
         state.stage = ResearchStage.DEFINITION
@@ -47,6 +51,10 @@ class DefinedProjectService:
         state.audit_log.append(
             AuditEvent(event="project_definition_attached", detail=project.project_id)
         )
+        if folder_id:
+            state.audit_log.append(
+                AuditEvent(event="folder_scope_attached", detail=folder_id)
+            )
 
         artifact_store = LocalArtifactStore(self.memory)
         project_artifact = ArtifactRecord(
