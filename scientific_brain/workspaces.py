@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import uuid
 from dataclasses import dataclass
 from typing import Any
@@ -9,11 +10,23 @@ import httpx
 from .auth import AuthenticatedUser, supabase_public_config
 
 
+def _normalize_doi(value: str | None) -> str:
+    if not value:
+        return ""
+    text = str(value).strip().lower()
+    text = re.sub(r"^https?://(?:dx\.)?doi\.org/", "", text)
+    return text.rstrip("/ ")
+
+
+def _normalize_title(value: str | None) -> str:
+    return re.sub(r"[^a-z0-9]+", "", str(value or "").lower())
+
+
 def _canonical_id(payload: dict[str, Any]) -> str:
     supplied = str(payload.get("canonical_id") or "").strip()
     if supplied:
         return supplied
-    doi = str(payload.get("doi") or "").strip().lower().removeprefix("https://doi.org/")
+    doi = _normalize_doi(payload.get("doi"))
     if doi:
         return f"doi:{doi}"
     arxiv_id = str(payload.get("arxiv_id") or "").strip()
@@ -114,10 +127,7 @@ class UserWorkspaceStore:
         self._delete("scibrain_folders", {"folder_id": f"eq.{folder_id}"})
 
     def get_folder(self, folder_id: str) -> dict[str, Any] | None:
-        rows = self._select(
-            "scibrain_folders",
-            {"folder_id": f"eq.{folder_id}", "select": "*", "limit": "1"},
-        )
+        rows = self._select("scibrain_folders", {"folder_id": f"eq.{folder_id}", "select": "*", "limit": "1"})
         return rows[0] if rows else None
 
     def list_papers(self, folder_id: str) -> list[dict[str, Any]]:
@@ -130,13 +140,52 @@ class UserWorkspaceStore:
             },
         )
 
+    def get_paper(self, item_id: str) -> dict[str, Any] | None:
+        rows = self._select("scibrain_folder_papers", {"item_id": f"eq.{item_id}", "select": "*", "limit": "1"})
+        return rows[0] if rows else None
+
+    def find_duplicate(self, folder_id: str, payload: dict[str, Any]) -> dict[str, Any] | None:
+        canonical = _canonical_id(payload)
+        if not canonical.startswith("userdoc:"):
+            rows = self._select(
+                "scibrain_folder_papers",
+                {"folder_id": f"eq.{folder_id}", "canonical_id": f"eq.{canonical}", "select": "*", "limit": "1"},
+            )
+            if rows:
+                return rows[0]
+
+        doi = _normalize_doi(payload.get("doi"))
+        title_key = _normalize_title(payload.get("title"))
+        for row in self.list_papers(folder_id):
+            if doi and _normalize_doi(row.get("doi")) == doi:
+                return row
+            if title_key and len(title_key) >= 12 and _normalize_title(row.get("title")) == title_key:
+                return row
+        return None
+
     def add_paper(self, folder_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         title = str(payload.get("title") or "").strip()
         if not title:
             raise ValueError("Paper title is required")
+
+        existing = self.find_duplicate(folder_id, payload)
+        if existing:
+            allowed = {
+                "project_id", "title", "authors", "publication_date", "journal", "doi", "arxiv_id",
+                "source_url", "pdf_url", "access_status", "manual_lookup_required", "storage_path",
+                "original_filename", "mime_type", "file_size_bytes", "review_depth", "notes",
+            }
+            updates = {k: v for k, v in payload.items() if k in allowed and v not in (None, "", [])}
+            if payload.get("storage_path"):
+                updates.update({"access_status": "uploaded", "manual_lookup_required": False})
+            merged = self.update_paper(existing["item_id"], updates) if updates else existing
+            merged["deduplicated"] = True
+            return merged
+
         canonical = _canonical_id(payload)
         source_url = payload.get("source_url") or payload.get("url")
         source_type = payload.get("source_type") or "manual"
+        normalized_doi = _normalize_doi(payload.get("doi")) or None
         record = payload.get("record") or {
             "canonical_id": canonical,
             "title": title,
@@ -144,7 +193,7 @@ class UserWorkspaceStore:
             "authors": payload.get("authors") or [],
             "publication_date": payload.get("publication_date"),
             "journal": payload.get("journal"),
-            "doi": payload.get("doi"),
+            "doi": normalized_doi,
             "arxiv_id": payload.get("arxiv_id"),
             "url": source_url,
             "cited_by_count": int(payload.get("cited_by_count") or 0),
@@ -160,7 +209,7 @@ class UserWorkspaceStore:
             "authors": payload.get("authors") or [],
             "publication_date": payload.get("publication_date"),
             "journal": payload.get("journal"),
-            "doi": payload.get("doi"),
+            "doi": normalized_doi,
             "arxiv_id": payload.get("arxiv_id"),
             "source_type": source_type,
             "source_url": source_url,
@@ -175,7 +224,9 @@ class UserWorkspaceStore:
             "record": record,
             "notes": payload.get("notes"),
         }
-        return self._insert("scibrain_folder_papers", row)
+        created = self._insert("scibrain_folder_papers", row)
+        created["deduplicated"] = False
+        return created
 
     def update_paper(self, item_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         allowed = {
@@ -184,11 +235,26 @@ class UserWorkspaceStore:
             "original_filename", "mime_type", "file_size_bytes", "review_depth", "record", "analysis",
             "critique", "specialist_reviews", "notes",
         }
-        return self._patch(
-            "scibrain_folder_papers",
-            {"item_id": f"eq.{item_id}"},
-            {key: value for key, value in payload.items() if key in allowed},
-        )
+        clean = {key: value for key, value in payload.items() if key in allowed}
+        if "doi" in clean:
+            clean["doi"] = _normalize_doi(clean["doi"]) or None
+        return self._patch("scibrain_folder_papers", {"item_id": f"eq.{item_id}"}, clean)
+
+    def attach_pdf(self, item_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        paper = self.get_paper(item_id)
+        if not paper:
+            raise KeyError("paper_not_found")
+        storage_path = str(payload.get("storage_path") or "").strip()
+        if not storage_path:
+            raise ValueError("storage_path is required")
+        return self.update_paper(item_id, {
+            "storage_path": storage_path,
+            "original_filename": payload.get("original_filename"),
+            "mime_type": payload.get("mime_type") or "application/pdf",
+            "file_size_bytes": payload.get("file_size_bytes"),
+            "access_status": "uploaded",
+            "manual_lookup_required": False,
+        })
 
     def delete_paper(self, item_id: str) -> None:
         self._delete("scibrain_folder_papers", {"item_id": f"eq.{item_id}"})
