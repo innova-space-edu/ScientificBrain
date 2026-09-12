@@ -30,7 +30,6 @@ class ReviewDepth(StrEnum):
 
 
 class ResearchStage(StrEnum):
-    # Explicit scientific protocol stages.
     DEFINITION = "definition"
     LITERATURE = "literature"
     THEORY = "theory"
@@ -44,7 +43,6 @@ class ResearchStage(StrEnum):
     WRITING = "writing"
     REVIEW = "review"
 
-    # Legacy/internal workflow stages retained for compatibility with the v0.3 paper-synthesis path.
     INGESTION = "ingestion"
     CRITIQUE = "critique"
     EVIDENCE_GATE = "evidence_gate"
@@ -197,6 +195,8 @@ class AuditEvent(BaseModel):
 class ResearchState(BaseModel):
     session_id: str
     question: str
+    owner_id: str | None = None
+    folder_id: str | None = None
     project_id: str | None = None
     stage: ResearchStage = ResearchStage.INGESTION
     protocol_stage: str = "definition"
