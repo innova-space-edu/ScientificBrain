@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ScientificBrain</title>
+  <link rel="stylesheet" href="/assets/styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="mark">SB</div>
+        <div><strong>ScientificBrain</strong><span>Research OS</span></div>
+      </div>
+      <nav>
+        <button class="nav active" data-view="overview">Overview</button>
+        <button class="nav" data-view="definition">Project definition</button>
+        <button class="nav" data-view="session">Research session</button>
+        <button class="nav" data-view="protocol">Protocol</button>
+        <button class="nav" data-view="projects">Projects</button>
+      </nav>
+      <div class="sidebar-foot">
+        <div class="mini"><span id="provider-dot" class="dot"></span><span id="provider-label">Checking inference…</span></div>
+        <div class="mini"><span id="storage-dot" class="dot"></span><span id="storage-label">Checking storage…</span></div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Evidence-grounded scientific reasoning</p>
+          <h1 id="page-title">Overview</h1>
+        </div>
+        <div class="top-actions">
+          <span class="badge" id="version-badge">v—</span>
+          <span class="badge accent" id="stage-badge">No active session</span>
+        </div>
+      </header>
+
+      <section id="view-overview" class="view active">
+        <div class="grid cards-4">
+          <article class="card metric"><span>Scientific agents</span><strong id="metric-agents">—</strong><small>defined roles</small></article>
+          <article class="card metric"><span>Protocol stages</span><strong id="metric-stages">—</strong><small>gated progression</small></article>
+          <article class="card metric"><span>Hard rules</span><strong id="metric-rules">—</strong><small>non-negotiable</small></article>
+          <article class="card metric"><span>Corpus target</span><strong>100</strong><small>deep-reviewed papers</small></article>
+        </div>
+        <div class="grid two">
+          <article class="card">
+            <div class="card-head"><h2>Inference router</h2><span class="pill">cloud first</span></div>
+            <div id="provider-order" class="chips"></div>
+            <p class="muted">Models are replaceable. Scientific state, evidence and project definitions remain provider-independent.</p>
+          </article>
+          <article class="card">
+            <div class="card-head"><h2>Scientific invariants</h2></div>
+            <ul id="hard-rules" class="rule-list"></ul>
+          </article>
+        </div>
+        <article class="card">
+          <div class="card-head"><h2>Current protocol</h2><button class="ghost" data-jump="protocol">Open protocol</button></div>
+          <div id="overview-protocol" class="timeline"></div>
+        </article>
+      </section>
+
+      <section id="view-definition" class="view">
+        <div class="grid definition-grid">
+          <article class="card editor-card">
+            <div class="card-head">
+              <div><h2>Canonical project definition</h2><p class="muted">This object cannot be silently rewritten by agents.</p></div>
+              <div class="row"><button id="load-template" class="ghost">Load template</button><button id="validate-project" class="secondary">Validate</button><button id="create-project" class="primary">Create project</button></div>
+            </div>
+            <textarea id="project-json" spellcheck="false" aria-label="Research project JSON"></textarea>
+          </article>
+          <aside class="card inspector">
+            <h2>Definition gate</h2>
+            <div id="validation-status" class="status-box neutral">Not validated</div>
+            <div id="validation-details" class="stack small"></div>
+            <hr />
+            <h3>Required definition</h3>
+            <ul class="check-list">
+              <li>Scientific question + gap</li><li>Objectives + observables</li><li>Variables + operational definitions</li><li>Falsifiable hypotheses</li><li>Rejection criteria</li><li>Model/experiment/simulation definitions</li><li>Uncertainty</li><li>In-scope / out-of-scope</li><li>Required outputs</li>
+            </ul>
+          </aside>
+        </div>
+      </section>
+
+      <section id="view-session" class="view">
+        <div class="grid session-grid">
+          <article class="card">
+            <div class="card-head"><div><h2>Active research state</h2><p class="muted" id="session-id-label">No session loaded</p></div><div class="row"><input id="session-input" placeholder="research:…" /><button id="load-session" class="secondary">Load</button></div></div>
+            <div id="session-summary" class="empty">Create a project or load a session ID.</div>
+          </article>
+          <article class="card">
+            <div class="card-head"><h2>Stage agents</h2><button id="validate-stage" class="primary" disabled>Validate stage</button></div>
+            <div id="stage-agents" class="agent-list empty">No active stage.</div>
+          </article>
+        </div>
+        <div class="grid two">
+          <article class="card">
+            <div class="card-head"><h2>Add external artifact</h2><span class="pill">human / instrument</span></div>
+            <label>Artifact type<input id="artifact-type" placeholder="raw_data_or_run_outputs" /></label>
+            <label>JSON payload<textarea id="artifact-payload" class="small-editor">{}</textarea></label>
+            <button id="add-artifact" class="secondary" disabled>Add artifact</button>
+          </article>
+          <article class="card">
+            <div class="card-head"><h2>Artifacts</h2><span id="artifact-count" class="pill">0</span></div>
+            <div id="artifact-list" class="artifact-list empty">No artifacts loaded.</div>
+          </article>
+        </div>
+        <article class="card console-card">
+          <div class="card-head"><h2>Execution log</h2><button id="clear-log" class="ghost">Clear</button></div>
+          <pre id="execution-log">ScientificBrain ready.</pre>
+        </article>
+      </section>
+
+      <section id="view-protocol" class="view">
+        <article class="card">
+          <div class="card-head"><div><h2>Scientific research protocol</h2><p class="muted">A stage advances only when required artifacts and scientific gates pass.</p></div></div>
+          <div id="protocol-list" class="protocol-list"></div>
+        </article>
+        <article class="card">
+          <div class="card-head"><h2>Agent registry</h2><span id="agent-count" class="pill"></span></div>
+          <div id="agent-registry" class="agent-table"></div>
+        </article>
+      </section>
+
+      <section id="view-projects" class="view">
+        <article class="card">
+          <div class="card-head"><div><h2>Persistent projects</h2><p class="muted">Requires Supabase production storage.</p></div><button id="refresh-projects" class="secondary">Refresh</button></div>
+          <div id="projects-list" class="projects-table empty">No projects loaded.</div>
+        </article>
+      </section>
+    </main>
+  </div>
+  <div id="toast" class="toast"></div>
+  <script src="/assets/app.js"></script>
+</body>
+</html>
