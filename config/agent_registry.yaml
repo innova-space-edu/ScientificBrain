@@ -1,17 +1,18 @@
-version: 1
+version: 2
 principles:
   - every_agent_has_single_primary_responsibility
   - every_output_is_structured_or_evidence_linked
   - self_critique_does_not_replace_independent_review
   - downstream_agents_read_research_state_not_only_previous_prose
   - agents_may_block_progress_when_required_evidence_is_missing
+  - protocol_artifact_names_are_canonical
 agents:
   - id: research_director
     stage: definition
     task: research
     purpose: Maintain scope, question, objectives, dependencies, decisions and stage transitions.
     inputs: [project_definition, research_state]
-    outputs: [validated_scope, work_plan, decision_log]
+    outputs: [project_definition, work_plan, decision_log]
     required_checks: [scope_consistency, objective_traceability, unresolved_blockers]
     can_block: true
   - id: literature
@@ -19,7 +20,7 @@ agents:
     task: long_context
     purpose: Reconstruct the literature landscape without flattening incompatible regimes.
     inputs: [research_question, corpus_policy, discovered_papers]
-    outputs: [literature_map, gap_map, source_priorities]
+    outputs: [literature_map, contradiction_map, gap_map, source_priorities]
     required_checks: [coverage, recency, foundational_work, contradictory_work, regime_matching]
     can_block: true
   - id: evidence
@@ -27,38 +28,38 @@ agents:
     task: structured
     purpose: Convert source material into claims with explicit provenance and epistemic status.
     inputs: [paper_full_text, metadata]
-    outputs: [claims, evidence_records, source_pointers]
+    outputs: [evidence_records, claims, source_pointers]
     required_checks: [claim_to_evidence, provenance, quotation_boundary, inference_labeling]
     can_block: true
   - id: theory
     stage: theory
     task: research
     purpose: Audit governing physics, equations, closures, orderings, limiting cases and conservation.
-    inputs: [research_state, theory_models, evidence]
-    outputs: [theory_review, regime_constraints, theoretical_predictions]
+    inputs: [research_state, theory_models, evidence_records]
+    outputs: [theory_review, regime_map, theoretical_predictions]
     required_checks: [dimensions, closures, ordering, conservation, limiting_cases]
     can_block: true
   - id: hypothesis
     stage: hypothesis
     task: research
     purpose: Generate competing falsifiable hypotheses and explicit rejection criteria.
-    inputs: [literature_map, theory_review, unresolved_questions]
-    outputs: [hypotheses, predictions, rejection_criteria]
+    inputs: [literature_map, theory_review, gap_map]
+    outputs: [competing_hypotheses, predictions, rejection_criteria]
     required_checks: [falsifiability, mechanism, observables, competing_explanations]
     can_block: true
   - id: experiment
     stage: design
     task: research
     purpose: Design experiments that discriminate hypotheses rather than merely confirm one.
-    inputs: [hypotheses, variables, constraints]
-    outputs: [experiment_designs, controls, acceptance_criteria]
+    inputs: [competing_hypotheses, project_definition, constraints]
+    outputs: [experiment_design, controls, acceptance_criteria]
     required_checks: [controls, repetitions, confounders, discriminating_power, failure_modes]
     can_block: true
   - id: diagnostics
     stage: design
     task: research
     purpose: Define what each diagnostic actually measures and with what resolution and bias.
-    inputs: [experiment_designs, observables]
+    inputs: [experiment_design, project_definition]
     outputs: [diagnostic_plan, calibration_plan, resolution_requirements]
     required_checks: [calibration, bandwidth, temporal_resolution, spatial_resolution, perturbation]
     can_block: true
@@ -66,7 +67,7 @@ agents:
     stage: design
     task: structured
     purpose: Quantify uncertainty, detection/quantification limits and calibration traceability.
-    inputs: [diagnostic_plan, variables, expected_signals]
+    inputs: [diagnostic_plan, project_definition, expected_signals]
     outputs: [uncertainty_budget, lod_loq, propagation_plan]
     required_checks: [random_uncertainty, systematic_uncertainty, propagation, traceability]
     can_block: true
@@ -74,7 +75,7 @@ agents:
     stage: design
     task: code
     purpose: Define and audit numerical models, solvers, convergence, numerical error and validation.
-    inputs: [hypotheses, theory_models, parameter_regime]
+    inputs: [competing_hypotheses, theory_review, project_definition]
     outputs: [simulation_plan, convergence_plan, validation_plan]
     required_checks: [resolution, timestep, boundaries, initial_conditions, numerical_error, convergence]
     can_block: true
@@ -82,23 +83,31 @@ agents:
     stage: analysis
     task: code
     purpose: Transform raw data reproducibly without altering the scientific meaning of measurements.
-    inputs: [raw_data, calibration, processing_plan]
-    outputs: [processed_data, processing_log, derived_quantities]
+    inputs: [raw_data_or_run_outputs, diagnostic_plan, uncertainty_budget]
+    outputs: [processing_log, processed_data, derived_quantities]
     required_checks: [versioned_processing, units, missing_data, outlier_policy, reproducibility]
     can_block: true
   - id: statistics
     stage: analysis
     task: research
     purpose: Quantify variation, effect size, model fit and uncertainty without overstating significance.
-    inputs: [processed_data, hypotheses, uncertainty_budget]
+    inputs: [processed_data, competing_hypotheses, uncertainty_budget]
     outputs: [statistical_results, sensitivity_analysis, uncertainty_propagation]
     required_checks: [sample_size, assumptions, effect_size, multiple_testing, robustness]
+    can_block: true
+  - id: interpretation
+    stage: interpretation
+    task: research
+    purpose: Build the preferred interpretation while preserving epistemic status and regime limits.
+    inputs: [processed_data, statistical_results, theory_review, evidence_records]
+    outputs: [interpretation, claim_status_map]
+    required_checks: [measured_vs_inferred, regime_limits, causal_language, uncertainty]
     can_block: true
   - id: alternatives
     stage: interpretation
     task: research
     purpose: Generate physically plausible competing explanations and discriminating tests.
-    inputs: [results, theory_review, literature_map]
+    inputs: [interpretation, statistical_results, theory_review, literature_map]
     outputs: [alternative_explanations, discriminating_observables, falsification_tests]
     required_checks: [physical_plausibility, testability, evidence_for_against]
     can_block: false
@@ -106,15 +115,15 @@ agents:
     stage: criticism
     task: research
     purpose: Attempt to break the preferred interpretation using evidence gaps and alternative mechanisms.
-    inputs: [interpretation, alternatives, evidence, uncertainty_budget]
-    outputs: [major_concerns, minor_concerns, required_tests]
+    inputs: [interpretation, alternative_explanations, evidence_records, uncertainty_budget]
+    outputs: [adversarial_review, required_tests]
     required_checks: [regime_mismatch, hidden_assumptions, causal_overreach, contradictory_evidence]
     can_block: true
   - id: reproducibility
     stage: reproducibility
     task: structured
     purpose: Determine whether an independent group can recreate calculations, simulations and measurements.
-    inputs: [methods, data, code, parameters, calibration]
+    inputs: [experiment_design, diagnostic_plan, simulation_plan, processing_log, code, parameters]
     outputs: [reproducibility_report, missing_artifacts]
     required_checks: [parameters, versions, data_availability, code_availability, acceptance_criteria]
     can_block: true
@@ -122,15 +131,15 @@ agents:
     stage: writing
     task: text
     purpose: Convert accepted scientific state into prose without creating new scientific claims.
-    inputs: [accepted_research_state, evidence]
-    outputs: [manuscript_or_report]
+    inputs: [accepted_research_state, evidence_records, interpretation, reproducibility_report]
+    outputs: [draft]
     required_checks: [claim_evidence_links, epistemic_status, limitations, scope]
     can_block: false
   - id: reviewer
     stage: review
     task: structured
     purpose: Perform final peer-review-style audit and route required revisions to responsible agents.
-    inputs: [manuscript_or_report, research_state, evidence]
-    outputs: [verdict, required_changes, routing]
+    inputs: [draft, research_state, evidence_records]
+    outputs: [review_verdict, required_changes, routing]
     required_checks: [originality, theory, methodology, diagnostics, statistics, reproducibility, claims_vs_evidence]
     can_block: true
