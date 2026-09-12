@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .artifacts import ArtifactRecord, LocalArtifactStore
 from .memory import ScientificMemory
 from .models import AuditEvent, ResearchStage
 from .persistence import SnapshotStore
@@ -46,6 +47,19 @@ class DefinedProjectService:
         state.audit_log.append(
             AuditEvent(event="project_definition_attached", detail=project.project_id)
         )
+
+        artifact_store = LocalArtifactStore(self.memory)
+        artifact_store.save(ArtifactRecord(
+            artifact_id=f"{state.session_id}:project_definition:r1",
+            session_id=state.session_id,
+            artifact_type="project_definition",
+            producer_agent="human_definition",
+            stage="definition",
+            payload=project.model_dump(mode="json"),
+            revision=1,
+            accepted=True,
+        ))
+
         self.memory.record_gate(gate, session_id=state.session_id)
         self.memory.save_state(state)
         if self.snapshot_store:
