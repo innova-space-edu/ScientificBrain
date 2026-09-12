@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from typing import Any
 
@@ -57,8 +58,8 @@ class LocalArtifactStore:
                 artifact.artifact_type,
                 artifact.producer_agent,
                 artifact.stage,
-                artifact.model_dump_json(include={"payload"}),
-                ArtifactRecord.model_construct(evidence_ids=artifact.evidence_ids).model_dump_json(include={"evidence_ids"}),
+                json.dumps(artifact.payload, ensure_ascii=False, default=str),
+                json.dumps(artifact.evidence_ids, ensure_ascii=False),
                 artifact.revision,
                 int(artifact.accepted),
                 artifact.created_at.isoformat(),
@@ -67,18 +68,14 @@ class LocalArtifactStore:
         self.memory.conn.commit()
 
     def _from_row(self, row) -> ArtifactRecord:
-        import json
-
-        payload = json.loads(row["payload_json"])["payload"]
-        evidence_ids = json.loads(row["evidence_ids_json"])["evidence_ids"]
         return ArtifactRecord(
             artifact_id=row["artifact_id"],
             session_id=row["session_id"],
             artifact_type=row["artifact_type"],
             producer_agent=row["producer_agent"],
             stage=row["stage"],
-            payload=payload,
-            evidence_ids=evidence_ids,
+            payload=json.loads(row["payload_json"]),
+            evidence_ids=json.loads(row["evidence_ids_json"]),
             revision=row["revision"],
             accepted=bool(row["accepted"]),
             created_at=row["created_at"],
