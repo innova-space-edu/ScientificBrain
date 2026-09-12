@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import uuid
 from dataclasses import dataclass
 from typing import Any
@@ -8,6 +7,19 @@ from typing import Any
 import httpx
 
 from .auth import AuthenticatedUser, supabase_public_config
+
+
+def _canonical_id(payload: dict[str, Any]) -> str:
+    supplied = str(payload.get("canonical_id") or "").strip()
+    if supplied:
+        return supplied
+    doi = str(payload.get("doi") or "").strip().lower().removeprefix("https://doi.org/")
+    if doi:
+        return f"doi:{doi}"
+    arxiv_id = str(payload.get("arxiv_id") or "").strip()
+    if arxiv_id:
+        return f"arxiv:{arxiv_id}"
+    return f"userdoc:{uuid.uuid4()}"
 
 
 @dataclass
@@ -122,19 +134,36 @@ class UserWorkspaceStore:
         title = str(payload.get("title") or "").strip()
         if not title:
             raise ValueError("Paper title is required")
+        canonical = _canonical_id(payload)
+        source_url = payload.get("source_url") or payload.get("url")
+        source_type = payload.get("source_type") or "manual"
+        record = payload.get("record") or {
+            "canonical_id": canonical,
+            "title": title,
+            "abstract": payload.get("abstract") or "",
+            "authors": payload.get("authors") or [],
+            "publication_date": payload.get("publication_date"),
+            "journal": payload.get("journal"),
+            "doi": payload.get("doi"),
+            "arxiv_id": payload.get("arxiv_id"),
+            "url": source_url,
+            "cited_by_count": int(payload.get("cited_by_count") or 0),
+            "plasma_topics": payload.get("plasma_topics") or [],
+            "source": source_type,
+        }
         row = {
             "owner_id": self.user.user_id,
             "folder_id": folder_id,
             "project_id": payload.get("project_id"),
-            "canonical_id": payload.get("canonical_id"),
+            "canonical_id": canonical,
             "title": title,
             "authors": payload.get("authors") or [],
             "publication_date": payload.get("publication_date"),
             "journal": payload.get("journal"),
             "doi": payload.get("doi"),
             "arxiv_id": payload.get("arxiv_id"),
-            "source_type": payload.get("source_type") or "manual",
-            "source_url": payload.get("source_url"),
+            "source_type": source_type,
+            "source_url": source_url,
             "pdf_url": payload.get("pdf_url"),
             "access_status": payload.get("access_status") or "metadata_only",
             "manual_lookup_required": bool(payload.get("manual_lookup_required", False)),
@@ -143,7 +172,7 @@ class UserWorkspaceStore:
             "mime_type": payload.get("mime_type"),
             "file_size_bytes": payload.get("file_size_bytes"),
             "review_depth": payload.get("review_depth") or "metadata_verified",
-            "record": payload.get("record") or {},
+            "record": record,
             "notes": payload.get("notes"),
         }
         return self._insert("scibrain_folder_papers", row)
