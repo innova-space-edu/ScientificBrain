@@ -48,6 +48,11 @@ class ScientificOrchestrator:
         registry = load_agent_registry()
         return [agent for agent in registry["agents"] if agent["stage"] == stage]
 
+    def _persist_artifact(self, store: LocalArtifactStore, record: ArtifactRecord) -> None:
+        store.save(record)
+        if self.snapshot_store:
+            self.snapshot_store.save_artifact(record)
+
     def add_external_artifact(
         self,
         session_id: str,
@@ -72,7 +77,7 @@ class ScientificOrchestrator:
             revision=revision,
             accepted=accepted,
         )
-        store.save(record)
+        self._persist_artifact(store, record)
         return record
 
     def run_stage(
@@ -113,37 +118,36 @@ class ScientificOrchestrator:
             independent = _independent_provider(self.provider, spec["task"])
             agent = ConfiguredScientificAgent(spec["id"], primary, independent)
             execution = agent.run(context)
-            agent.persist(session_id, execution, artifact_store)
+            records = agent.persist(session_id, execution, artifact_store)
+            if self.snapshot_store:
+                for record in records:
+                    self.snapshot_store.save_artifact(record)
             executions.append(execution.model_dump(mode="json"))
             if spec.get("can_block") and not execution.review_passed:
                 hard_agent_failure = True
 
-            # Every downstream agent sees accepted outputs from earlier agents in the same stage.
+            # Every downstream agent sees outputs from earlier agents in the same stage.
             context["artifacts"] = artifact_store.context(session_id)
 
         gate_factory = StageGateFactory(self.memory, artifact_store, state, project)
         gate_results = gate_factory.for_stage(current_stage)
-        if hard_agent_failure:
-            gate_results.append(GateResult(
-                name="agent_independent_review",
-                passed=False,
-                score=0.0,
-                blockers=["At least one blocking agent failed independent review"],
-            ))
-        else:
-            gate_results.append(GateResult(
-                name="agent_independent_review",
-                passed=True,
-                score=1.0,
-            ))
+        gate_results.append(GateResult(
+            name="agent_independent_review",
+            passed=not hard_agent_failure,
+            score=0.0 if hard_agent_failure else 1.0,
+            blockers=["At least one blocking agent failed independent review"] if hard_agent_failure else [],
+        ))
 
-        # Protocol gates are evaluated independently from the generic agent-review gate.
         for gate in gate_results:
             self.memory.record_gate(gate, session_id=session_id)
         state.gate_results.extend(gate_results)
 
         artifacts = artifact_store.context(session_id)
         decision = protocol.validate_stage(current_stage, artifacts, gate_results)
+        if hard_agent_failure:
+            decision.passed = False
+            if "agent_independent_review" not in decision.failed_gates:
+                decision.failed_gates.append("agent_independent_review")
         next_stage = protocol.next_stage(current_stage) if decision.passed else None
 
         if decision.passed:
