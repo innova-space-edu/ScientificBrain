@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -159,7 +160,7 @@ class UserSnapshotStore:
             {
                 "folder_id": f"eq.{self.folder_id}",
                 "canonical_id": f"eq.{paper_id}",
-                "select": "item_id,record,analysis,critique,specialist_reviews,review_depth",
+                "select": "item_id,record,analysis,critique,specialist_reviews,review_depth,storage_path,pdf_url,source_url,access_status,original_filename",
                 "limit": "1",
             },
         )
@@ -212,6 +213,32 @@ class UserSnapshotStore:
                     "specialist_reviews": row.get("specialist_reviews") or [],
                 })
         return results
+
+    def paper_source(self, paper_id: str) -> dict[str, Any] | None:
+        row = self._paper_row(paper_id)
+        if not row:
+            return None
+        return {
+            "storage_path": row.get("storage_path"),
+            "pdf_url": row.get("pdf_url"),
+            "source_url": row.get("source_url"),
+            "access_status": row.get("access_status"),
+            "original_filename": row.get("original_filename"),
+        }
+
+    def fetch_paper_pdf(self, paper_id: str) -> tuple[str, bytes] | None:
+        source = self.paper_source(paper_id)
+        if not source or not source.get("storage_path"):
+            return None
+        path = "/".join(quote(segment, safe="") for segment in str(source["storage_path"]).split("/"))
+        url = f"{self.url}/storage/v1/object/authenticated/scibrain-papers/{path}"
+        response = httpx.get(
+            url,
+            headers={"apikey": self.key, "Authorization": f"Bearer {self.user.access_token}"},
+            timeout=max(self.timeout, 60.0),
+        )
+        response.raise_for_status()
+        return url, response.content
 
     def create_job(self, session_id: str, job_type: str, payload: dict[str, Any]) -> dict[str, Any]:
         row = {
