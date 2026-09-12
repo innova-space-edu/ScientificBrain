@@ -51,10 +51,16 @@ class CloudPaperService:
             data = fetch_pdf(pdf_url)
             document = extract_pdf_bytes(paper.canonical_id, pdf_url, data)
         else:
-            document = ingest_open_access_paper(
-                paper,
-                unpaywall_email=os.getenv("UNPAYWALL_EMAIL"),
-            )
+            private_fetch = getattr(self.snapshot_store, "fetch_paper_pdf", None)
+            private_pdf = private_fetch(paper_id) if callable(private_fetch) else None
+            if private_pdf:
+                source_url, data = private_pdf
+                document = extract_pdf_bytes(paper.canonical_id, source_url, data)
+            else:
+                document = ingest_open_access_paper(
+                    paper,
+                    unpaywall_email=os.getenv("UNPAYWALL_EMAIL"),
+                )
         result = ScientificWorkflow(self.memory, self.provider).review_paper(
             paper_id,
             document.text,
