@@ -15,6 +15,9 @@
     { "source": "/api/project_template", "destination": "/api/meta?op=project_template" },
     { "source": "/api/validate_project", "destination": "/api/meta?op=validate_project" },
 
+    { "source": "/api/consent", "destination": "/api/workspace?op=consent" },
+    { "source": "/api/sync_context", "destination": "/api/workspace?op=sync_context" },
+    { "source": "/api/attach_pdf", "destination": "/api/workspace?op=attach_pdf" },
     { "source": "/api/folders", "destination": "/api/workspace?op=folders" },
     { "source": "/api/library", "destination": "/api/workspace?op=library" },
     { "source": "/api/projects", "destination": "/api/workspace?op=projects" },
