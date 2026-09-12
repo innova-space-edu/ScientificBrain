@@ -11,7 +11,7 @@ from .corpus import audit_corpus, coverage_gaps, load_corpus_policy
 from .discovery import OpenAlexClient
 from .memory import ScientificMemory
 from .models import ReviewDepth
-from .providers import provider_from_env
+from .providers import provider_configuration_summary, provider_from_env
 from .taxonomy import load_taxonomy
 from .workflow import ScientificWorkflow
 
@@ -74,6 +74,12 @@ def stats(db: Path = Path("scientific_brain.db")) -> None:
         console.print(memory.stats())
 
 
+@app.command("provider-status")
+def provider_status(task: str = "research") -> None:
+    """Show safe inference routing status. API keys are never printed."""
+    console.print_json(data=provider_configuration_summary(task))
+
+
 @app.command("corpus-audit")
 def corpus_audit(
     db: Path = Path("scientific_brain.db"),
@@ -93,7 +99,10 @@ def review_paper(
     paper_id: str,
     text_file: Path,
     db: Path = Path("scientific_brain.db"),
-    provider: str = typer.Option("ollama", help="ollama or openai-compatible"),
+    provider: str = typer.Option(
+        "cloud",
+        help="cloud (default), ollama/local, or openai-compatible",
+    ),
     depth: str = typer.Option(ReviewDepth.FULL_TEXT.value),
 ) -> None:
     """Run extraction, independent specialist reviews and scientific gates for one paper."""
@@ -104,7 +113,7 @@ def review_paper(
     except ValueError as exc:
         raise typer.BadParameter(f"Invalid review depth: {depth}") from exc
 
-    llm = provider_from_env(provider)
+    llm = provider_from_env(provider, task="research")
     text = text_file.read_text(encoding="utf-8")
     with ScientificMemory(db) as memory:
         workflow = ScientificWorkflow(memory, llm)
@@ -139,10 +148,13 @@ def start_research(
 def synthesize(
     session_id: str,
     db: Path = Path("scientific_brain.db"),
-    provider: str = typer.Option("ollama", help="ollama or openai-compatible"),
+    provider: str = typer.Option(
+        "cloud",
+        help="cloud (default), ollama/local, or openai-compatible",
+    ),
 ) -> None:
     """Synthesize only papers that have passed evidence and provenance gates."""
-    llm = provider_from_env(provider)
+    llm = provider_from_env(provider, task="research")
     with ScientificMemory(db) as memory:
         workflow = ScientificWorkflow(memory, llm)
         state = workflow.synthesize_session(session_id)

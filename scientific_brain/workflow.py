@@ -28,6 +28,7 @@ from .models import (
     ResearchState,
     ReviewDepth,
 )
+from .providers import InferenceTask
 
 
 SYNTHESIS_ADVERSARIAL_SYSTEM = """You are ScientificBrain's cross-paper adversarial reviewer.
@@ -37,28 +38,36 @@ missing uncertainty, and alternative mechanisms. For every objection, identify t
 experiment that could resolve it. Never invent a paper, result, equation or measurement."""
 
 
+def _for_task(provider: object, task: InferenceTask | str) -> object:
+    selector = getattr(provider, "for_task", None)
+    if callable(selector):
+        return selector(task.value if isinstance(task, InferenceTask) else task)
+    return provider
+
+
 @dataclass
 class ScientificWorkflow:
     memory: ScientificMemory
     provider: object
 
     def _specialists(self, kind: PaperKind):
+        research_provider = _for_task(self.provider, InferenceTask.RESEARCH)
         agents = []
         if kind == PaperKind.EXPERIMENTAL:
-            agents.extend([ExperimentAgent(self.provider), TheoryAgent(self.provider)])
+            agents.extend([ExperimentAgent(research_provider), TheoryAgent(research_provider)])
         elif kind == PaperKind.THEORETICAL:
-            agents.append(TheoryAgent(self.provider))
+            agents.append(TheoryAgent(research_provider))
         elif kind == PaperKind.SIMULATION:
-            agents.extend([SimulationAgent(self.provider), TheoryAgent(self.provider)])
+            agents.extend([SimulationAgent(research_provider), TheoryAgent(research_provider)])
         elif kind == PaperKind.HYBRID:
             agents.extend([
-                TheoryAgent(self.provider),
-                ExperimentAgent(self.provider),
-                SimulationAgent(self.provider),
+                TheoryAgent(research_provider),
+                ExperimentAgent(research_provider),
+                SimulationAgent(research_provider),
             ])
         agents.extend([
-            AdversarialAgent(self.provider),
-            ReproducibilityAgent(self.provider),
+            AdversarialAgent(research_provider),
+            ReproducibilityAgent(research_provider),
         ])
         return agents
 
@@ -74,7 +83,10 @@ class ScientificWorkflow:
         if paper is None:
             raise KeyError(f"Unknown paper: {paper_id}")
 
-        analysis = PaperAgent(self.provider).analyze_structured(paper, text)
+        structured_provider = _for_task(self.provider, InferenceTask.STRUCTURED)
+        research_provider = _for_task(self.provider, InferenceTask.RESEARCH)
+
+        analysis = PaperAgent(structured_provider).analyze_structured(paper, text)
         analysis.review_depth = depth
         if paper.kind == PaperKind.UNKNOWN and analysis.inferred_kind != PaperKind.UNKNOWN:
             self.memory.set_paper_kind(paper_id, analysis.inferred_kind)
@@ -89,7 +101,7 @@ class ScientificWorkflow:
             content_sha256=content_hash,
         )
 
-        critique = CriticAgent(self.provider).critique_structured(paper, analysis)
+        critique = CriticAgent(research_provider).critique_structured(paper, analysis)
         self.memory.save_critique(critique)
 
         specialist_reviews = []
@@ -192,11 +204,16 @@ class ScientificWorkflow:
             self.memory.save_state(state)
             return state
 
+        long_context_provider = _for_task(self.provider, InferenceTask.LONG_CONTEXT)
+        research_provider = _for_task(self.provider, InferenceTask.RESEARCH)
+        text_provider = _for_task(self.provider, InferenceTask.TEXT)
+        structured_provider = _for_task(self.provider, InferenceTask.STRUCTURED)
+
         state.transition(ResearchStage.SYNTHESIS, f"Synthesizing {len(accepted)} accepted papers")
-        state.synthesis = SynthesizerAgent(self.provider).synthesize(state.question, bundle)
+        state.synthesis = SynthesizerAgent(long_context_provider).synthesize(state.question, bundle)
 
         state.transition(ResearchStage.ALTERNATIVES, "Generating discriminable alternative explanations")
-        alternatives = AlternativeExplanationAgent(self.provider).propose(
+        alternatives = AlternativeExplanationAgent(research_provider).propose(
             state.question,
             state.synthesis,
             bundle,
@@ -204,7 +221,7 @@ class ScientificWorkflow:
         state.alternative_explanations = alternatives.explanations
 
         state.transition(ResearchStage.ADVERSARIAL, "Cross-paper adversarial audit")
-        state.adversarial_review = self.provider.complete(  # type: ignore[attr-defined]
+        state.adversarial_review = research_provider.complete(  # type: ignore[attr-defined]
             SYNTHESIS_ADVERSARIAL_SYSTEM,
             f"QUESTION:\n{state.question}\n\nSYNTHESIS:\n{state.synthesis}\n\n"
             f"ALTERNATIVES:\n{alternatives.model_dump_json(indent=2)}\n\nEVIDENCE:\n{bundle}",
@@ -225,7 +242,7 @@ class ScientificWorkflow:
         state.reproducibility_review = "\n".join(reproducibility_summaries)
 
         state.transition(ResearchStage.WRITING, "Drafting evidence-linked scientific answer")
-        state.draft = WriterAgent(self.provider).write(
+        state.draft = WriterAgent(text_provider).write(
             state.question,
             state.synthesis,
             alternatives,
@@ -235,7 +252,7 @@ class ScientificWorkflow:
         )
 
         state.transition(ResearchStage.REVIEW, "Final claim-to-evidence audit")
-        verdict = ReviewerAgent(self.provider).review(state.draft, bundle)
+        verdict = ReviewerAgent(structured_provider).review(state.draft, bundle)
         state.review_verdict = verdict
         state.final_review = verdict.model_dump_json(indent=2)
         if verdict.passed:
