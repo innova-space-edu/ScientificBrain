@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import signal
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 
@@ -11,6 +13,55 @@ from scientific_brain.research_search import ResearchSearchService
 from scientific_brain.user_snapshot import UserSnapshotStore
 from scientific_brain.web_runtime import temporary_memory
 from scientific_brain.workspaces import UserWorkspaceStore
+
+
+class SoftJobTimeout(TimeoutError):
+    """Raised before the hosting platform hard-kills a long research request."""
+
+
+def _run_with_soft_timeout(callback, seconds: int):
+    """Run a job with a recoverable timeout when SIGALRM is available.
+
+    Vercel terminates a Python Function abruptly at its hard duration limit. If
+    that happens while a job is marked ``running``, the request cannot execute
+    cleanup code. This alarm fires earlier, allowing the API to put the job back
+    into ``pending`` so the user can retry instead of receiving a raw 504.
+    """
+
+    if not hasattr(signal, "SIGALRM") or not hasattr(signal, "setitimer"):
+        return callback()
+
+    previous_handler = signal.getsignal(signal.SIGALRM)
+
+    def _raise_timeout(_signum, _frame):
+        raise SoftJobTimeout(f"Research job exceeded the {seconds}s soft execution budget")
+
+    signal.signal(signal.SIGALRM, _raise_timeout)
+    signal.setitimer(signal.ITIMER_REAL, seconds)
+    try:
+        return callback()
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous_handler)
+
+
+def _job_soft_timeout_seconds() -> int:
+    try:
+        requested = int(os.getenv("SCIBRAIN_JOB_SOFT_TIMEOUT_SECONDS", "280"))
+    except ValueError:
+        requested = 280
+    # Keep enough time for Supabase status recovery before Vercel's 300s cap.
+    return max(30, min(requested, 280))
+
+
+def _configure_research_provider_timeout() -> None:
+    """Bound individual provider waits so failover cannot consume the whole job."""
+
+    if "EDUAI_AI_PROVIDER_TIMEOUT_MS" not in os.environ:
+        os.environ["EDUAI_AI_PROVIDER_TIMEOUT_MS"] = os.getenv(
+            "SCIBRAIN_RESEARCH_PROVIDER_TIMEOUT_MS",
+            "30000",
+        )
 
 
 class handler(BaseHTTPRequestHandler):
@@ -148,9 +199,35 @@ class handler(BaseHTTPRequestHandler):
                     raise ValueError("job is not attached to a folder or session")
 
                 store = UserSnapshotStore(user, folder_id=str(folder_id))
+                _configure_research_provider_timeout()
                 provider = provider_from_env("cloud", task="research")
-                with temporary_memory() as memory:
-                    result = ScientificJobProcessor(memory, provider, store).run(job_id)
+                timeout_seconds = _job_soft_timeout_seconds()
+                try:
+                    with temporary_memory() as memory:
+                        result = _run_with_soft_timeout(
+                            lambda: ScientificJobProcessor(memory, provider, store).run(job_id),
+                            timeout_seconds,
+                        )
+                except SoftJobTimeout as exc:
+                    current = store.get_job(job_id) or job
+                    progress = dict(current.get("progress") or {})
+                    progress.update({
+                        "retryable": True,
+                        "reason": "soft_timeout",
+                        "soft_timeout_seconds": timeout_seconds,
+                    })
+                    store.update_job(
+                        job_id,
+                        status="pending",
+                        progress=progress,
+                        last_error=(
+                            f"SoftJobTimeout: {exc}. The job was preserved and can be retried; "
+                            "the platform request was stopped before its hard timeout."
+                        ),
+                    )
+                    recovered = store.get_job(job_id) or current
+                    self._write(202, recovered)
+                    return
                 self._write(200, result)
                 return
 
