@@ -10,6 +10,7 @@ from scientific_brain.graph_store import ScientificGraphStore
 from scientific_brain.persistence import hydrate_memory_from_snapshot
 from scientific_brain.providers import provider_from_env
 from scientific_brain.stage_stepper import StageStepper
+from scientific_brain.studio import ResearchStudioService
 from scientific_brain.user_snapshot import UserSnapshotStore
 from scientific_brain.web_runtime import temporary_memory
 from scientific_brain.workspaces import UserWorkspaceStore
@@ -53,6 +54,33 @@ class handler(BaseHTTPRequestHandler):
         op = self._op()
         query = self._query()
         try:
+            studio = ResearchStudioService(user)
+            if op == "study":
+                study_id = (query.get("study_id") or [None])[0]
+                folder_id = (query.get("folder_id") or [None])[0]
+                if study_id:
+                    study = studio.store.get_study(study_id)
+                elif folder_id:
+                    study = studio.store.latest_study(folder_id)
+                else:
+                    raise ValueError("study_id or folder_id is required")
+                self._write(200, {"study": study})
+                return
+
+            if op == "study_messages":
+                study_id = (query.get("study_id") or [""])[0]
+                if not study_id:
+                    raise ValueError("study_id is required")
+                self._write(200, {"messages": studio.store.list_messages(study_id)})
+                return
+
+            if op == "study_reviews":
+                study_id = (query.get("study_id") or [""])[0]
+                if not study_id:
+                    raise ValueError("study_id is required")
+                self._write(200, {"reviews": studio.store.list_reviews(study_id)})
+                return
+
             folder_id = (query.get("folder_id") or [""])[0]
             if not folder_id:
                 raise ValueError("folder_id is required")
@@ -63,7 +91,10 @@ class handler(BaseHTTPRequestHandler):
                 return
             if op == "graph_nodes":
                 node_type = (query.get("node_type") or [None])[0]
-                nodes = graph_store.list_nodes(node_type=node_type, limit=int((query.get("limit") or ["5000"])[0]))
+                nodes = graph_store.list_nodes(
+                    node_type=node_type,
+                    limit=int((query.get("limit") or ["5000"])[0]),
+                )
                 self._write(200, {"nodes": [n.model_dump(mode="json") for n in nodes]})
                 return
             if op == "graph_edges":
@@ -85,6 +116,26 @@ class handler(BaseHTTPRequestHandler):
         except Exception as exc:
             self._write(500, {"error": type(exc).__name__, "detail": str(exc)})
 
+    def do_PATCH(self):
+        user = require_user(self)
+        if not user:
+            return
+        op = self._op()
+        try:
+            payload = self._body()
+            if op != "study":
+                self._write(404, {"error": "unknown_science_operation", "op": op})
+                return
+            study_id = str(payload.get("study_id") or "").strip()
+            if not study_id:
+                raise ValueError("study_id is required")
+            result = ResearchStudioService(user).store.update_study(study_id, payload)
+            self._write(200, {"study": result})
+        except (ValueError, KeyError, json.JSONDecodeError) as exc:
+            self._write(400, {"error": type(exc).__name__, "detail": str(exc)})
+        except Exception as exc:
+            self._write(500, {"error": type(exc).__name__, "detail": str(exc)})
+
     def do_POST(self):
         user = require_user(self)
         if not user:
@@ -92,6 +143,60 @@ class handler(BaseHTTPRequestHandler):
         op = self._op()
         try:
             payload = self._body()
+
+            if op in {
+                "study_create",
+                "study_suggest",
+                "study_generate",
+                "study_review",
+                "study_chat",
+            }:
+                studio = ResearchStudioService(user)
+                language = str(payload.get("language") or "es")[:8]
+
+                if op == "study_create":
+                    folder_id = str(payload.get("folder_id") or "").strip()
+                    topic = str(payload.get("topic") or "").strip()
+                    if not folder_id or not topic:
+                        raise ValueError("folder_id and topic are required")
+                    studio._ensure_folder(folder_id)
+                    study = studio.store.create_study(
+                        folder_id,
+                        topic,
+                        str(payload.get("research_question") or "").strip(),
+                        language,
+                    )
+                    self._write(201, {"study": study})
+                    return
+
+                if op == "study_suggest":
+                    folder_id = str(payload.get("folder_id") or "").strip()
+                    topic = str(payload.get("topic") or "").strip()
+                    if not folder_id or not topic:
+                        raise ValueError("folder_id and topic are required")
+                    self._write(200, studio.suggest(folder_id, topic, language))
+                    return
+
+                study_id = str(payload.get("study_id") or "").strip()
+                if not study_id:
+                    raise ValueError("study_id is required")
+
+                if op == "study_generate":
+                    self._write(200, {"study": studio.generate_draft(study_id, language)})
+                    return
+
+                if op == "study_review":
+                    section_key = str(payload.get("section_key") or "").strip()
+                    agent_role = str(payload.get("agent_role") or "adversarial").strip()
+                    review = studio.review_section(study_id, section_key, agent_role, language)
+                    self._write(201, {"review": review})
+                    return
+
+                if op == "study_chat":
+                    message = str(payload.get("message") or "").strip()
+                    agent_role = str(payload.get("agent_role") or "adversarial").strip()
+                    self._write(201, studio.chat(study_id, message, agent_role, language))
+                    return
 
             if op in {"build_graph", "detect_contradictions", "generate_hypotheses"}:
                 folder_id = str(payload.get("folder_id") or "").strip()
@@ -124,7 +229,9 @@ class handler(BaseHTTPRequestHandler):
                     return
 
                 if op == "detect_contradictions":
-                    contradictions = service.detect_contradictions(context=str(payload.get("context") or ""))
+                    contradictions = service.detect_contradictions(
+                        context=str(payload.get("context") or "")
+                    )
                     self._write(200, {
                         "folder_id": folder_id,
                         "count": len(contradictions),
