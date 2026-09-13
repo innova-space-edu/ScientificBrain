@@ -5,10 +5,10 @@ import os
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 
-from scientific_brain.adaptive_collaboration import AdaptiveCollaborativeResearchService
 from scientific_brain.advanced_roles import register_advanced_roles
 from scientific_brain.auth import require_user
 from scientific_brain.collaboration import AGENT_ROLES
+from scientific_brain.evidence_bound_collaboration import EvidenceBoundCollaborativeResearchService
 from scientific_brain.providers import provider_from_env
 from scientific_brain.research_versions import ResearchVersionStore
 
@@ -44,7 +44,7 @@ class handler(BaseHTTPRequestHandler):
     def _service(self, user, folder_id: str):
         if not folder_id:
             raise ValueError("folder_id is required")
-        return AdaptiveCollaborativeResearchService(
+        return EvidenceBoundCollaborativeResearchService(
             user=user,
             folder_id=folder_id,
             provider=provider_from_env("cloud", task="research"),
@@ -96,7 +96,7 @@ class handler(BaseHTTPRequestHandler):
             versions = ResearchVersionStore(user, folder_id)
             op = self._op()
 
-            if op in {"generate_draft", "save_brief", "assess_brief", "save_section", "save_topic", "rewrite_section"}:
+            if op in {"generate_draft", "save_brief", "assess_brief", "save_section", "save_topic", "rewrite_section", "verify_document"}:
                 versions.snapshot(versions.document(), reason=f"before_{op}")
 
             if op == "generate_draft":
@@ -149,6 +149,13 @@ class handler(BaseHTTPRequestHandler):
                 result = service.rewrite_section(
                     str(payload.get("section_key") or ""),
                     language=str(payload.get("language") or "es"),
+                )
+                self._write(200, self._snapshot_result(versions, result, op))
+                return
+            if op == "verify_document":
+                result = service.verify_document(
+                    language=str(payload.get("language") or "es"),
+                    use_model=bool(payload.get("use_model", True)),
                 )
                 self._write(200, self._snapshot_result(versions, result, op))
                 return
