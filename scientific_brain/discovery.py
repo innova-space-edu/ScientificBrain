@@ -30,6 +30,10 @@ def _canonical(doi: str | None, arxiv_id: str | None, openalex_id: str | None) -
     raise ValueError("Paper needs at least one stable identifier")
 
 
+def _unique(values: list[str]) -> list[str]:
+    return list(dict.fromkeys(x.strip() for x in values if x and x.strip()))
+
+
 class OpenAlexClient:
     BASE = "https://api.openalex.org/works"
 
@@ -51,7 +55,13 @@ class OpenAlexClient:
             doi = work.get("doi")
             title = work.get("title") or "Untitled"
             abstract = _invert_abstract(work.get("abstract_inverted_index"))
-            topics = classify_topics(f"{title}\n{abstract}", self.taxonomy)
+            openalex_topics = [
+                str(topic.get("display_name") or "")
+                for topic in (work.get("topics") or [])
+                if isinstance(topic, dict)
+            ]
+            taxonomy_topics = classify_topics(f"{title}\n{abstract}", self.taxonomy)
+            topics = _unique(openalex_topics + taxonomy_topics)
             pub_date = None
             if work.get("publication_date"):
                 try:
@@ -62,13 +72,18 @@ class OpenAlexClient:
                 canonical_id=_canonical(doi, None, work.get("id")),
                 title=title,
                 abstract=abstract,
-                authors=[a.get("author", {}).get("display_name", "") for a in work.get("authorships", []) if a.get("author")],
+                authors=[
+                    a.get("author", {}).get("display_name", "")
+                    for a in work.get("authorships", []) if a.get("author")
+                ],
                 publication_date=pub_date,
                 journal=((work.get("primary_location") or {}).get("source") or {}).get("display_name"),
                 doi=doi.removeprefix("https://doi.org/") if doi else None,
                 openalex_id=work.get("id"),
                 url=(work.get("primary_location") or {}).get("landing_page_url") or doi,
                 cited_by_count=work.get("cited_by_count", 0),
+                # Legacy field name retained for backward compatibility; it now carries
+                # general scientific topic labels as well as optional plasma taxonomy labels.
                 plasma_topics=topics,
                 source="openalex",
             ))
@@ -95,14 +110,23 @@ class ArxivClient:
             published = entry.findtext("a:published", default="", namespaces=self.NS)
             pub_date = date.fromisoformat(published[:10]) if published else None
             authors = [x.findtext("a:name", default="", namespaces=self.NS) for x in entry.findall("a:author", self.NS)]
+            categories = [x.attrib.get("term", "") for x in entry.findall("a:category", self.NS)]
             doi = None
             for link in entry.findall("a:link", self.NS):
                 href = link.attrib.get("href", "")
                 if "doi.org/" in href:
                     doi = href.split("doi.org/", 1)[1]
+            topics = _unique(categories + classify_topics(f"{title}\n{abstract}", self.taxonomy))
             papers.append(Paper(
-                canonical_id=_canonical(doi, arxiv_id, None), title=title, abstract=abstract,
-                authors=authors, publication_date=pub_date, doi=doi, arxiv_id=arxiv_id,
-                url=arxiv_url, plasma_topics=classify_topics(f"{title}\n{abstract}", self.taxonomy), source="arxiv",
+                canonical_id=_canonical(doi, arxiv_id, None),
+                title=title,
+                abstract=abstract,
+                authors=authors,
+                publication_date=pub_date,
+                doi=doi,
+                arxiv_id=arxiv_id,
+                url=arxiv_url,
+                plasma_topics=topics,
+                source="arxiv",
             ))
         return papers

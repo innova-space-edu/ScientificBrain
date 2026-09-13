@@ -1,0 +1,96 @@
+from __future__ import annotations
+
+import json
+import os
+from http.server import BaseHTTPRequestHandler
+from urllib.parse import parse_qs, urlparse
+
+from scientific_brain.auth import require_user
+from scientific_brain.persistence import hydrate_memory_from_snapshot
+from scientific_brain.providers import provider_from_env
+from scientific_brain.stage_stepper import StageStepper
+from scientific_brain.user_snapshot import UserSnapshotStore
+from scientific_brain.web_runtime import temporary_memory
+
+
+os.environ.setdefault(
+    "EDUAI_AI_PROVIDER_TIMEOUT_MS",
+    os.getenv("SCIBRAIN_RESEARCH_PROVIDER_TIMEOUT_MS", "30000"),
+)
+
+
+class handler(BaseHTTPRequestHandler):
+    def _query(self):
+        return parse_qs(urlparse(self.path).query)
+
+    def _op(self) -> str:
+        return (self._query().get("op") or [""])[0]
+
+    def _write(self, status: int, payload):
+        body = json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _body(self):
+        length = int(self.headers.get("Content-Length", "0"))
+        return json.loads(self.rfile.read(length) or b"{}")
+
+    def do_POST(self):
+        user = require_user(self)
+        if not user:
+            return
+        try:
+            payload = self._body()
+            session_id = str(payload.get("session_id") or "").strip()
+            if not session_id:
+                raise ValueError("session_id is required")
+            base_store = UserSnapshotStore(user)
+            state = base_store.load_state(session_id)
+            if state is None:
+                self._write(404, {"error": "session_not_found"})
+                return
+            store = UserSnapshotStore(user, folder_id=state.folder_id)
+            provider = provider_from_env("cloud", task="research")
+            op = self._op()
+
+            if op == "run_agent":
+                role_id = str(payload.get("role_id") or "").strip()
+                if not role_id:
+                    raise ValueError("role_id is required")
+                with temporary_memory() as memory:
+                    hydrate_memory_from_snapshot(memory, store, session_id)
+                    result = StageStepper(memory, provider, store).run_agent(
+                        session_id,
+                        role_id,
+                        extra_context=payload.get("context"),
+                    )
+                self._write(200, result.model_dump(mode="json"))
+                return
+
+            if op == "validate_stage":
+                with temporary_memory() as memory:
+                    hydrate_memory_from_snapshot(memory, store, session_id)
+                    result = StageStepper(memory, provider, store).validate_stage(session_id)
+                self._write(200, {
+                    "session_id": result.session_id,
+                    "stage": result.stage,
+                    "gates": [g.model_dump(mode="json") for g in result.gates],
+                    "decision": {
+                        "passed": result.decision.passed,
+                        "missing_artifacts": result.decision.missing_artifacts,
+                        "failed_gates": result.decision.failed_gates,
+                        "completion_rule": result.decision.completion_rule,
+                    },
+                    "next_stage": result.next_stage,
+                })
+                return
+
+            self._write(404, {"error": "unknown_orchestration_operation", "op": op})
+        except (ValueError, KeyError, json.JSONDecodeError) as exc:
+            self._write(400, {"error": type(exc).__name__, "detail": str(exc)})
+        except Exception as exc:
+            self._write(500, {"error": type(exc).__name__, "detail": str(exc)})
