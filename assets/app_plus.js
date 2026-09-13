@@ -2,6 +2,7 @@
   const i18n = () => window.SBI18N;
   const t = (key, fallback='') => i18n()?.t(key, fallback) || fallback || key;
   let consentRequired = false;
+  let consentState = null;
   let queueRunning = false;
 
   const originals = {
@@ -22,6 +23,87 @@
     return originals.toast ? originals.toast(text, bad) : undefined;
   }
   if (originals.toast) toast = translatedToast;
+
+  function localizedConsentStatus(status) {
+    const lang = i18n()?.language?.() || 'es';
+    const acceptedAt = status?.consent?.accepted_at ? new Date(status.consent.accepted_at) : null;
+    const date = acceptedAt && !Number.isNaN(acceptedAt.getTime())
+      ? acceptedAt.toLocaleDateString(lang === 'es' ? 'es-CL' : lang)
+      : '';
+    if (status?.accepted) {
+      if (lang === 'en') return `Terms of use, AI, data processing and cybersecurity accepted${date ? ` · ${date}` : ''}.`;
+      if (lang === 'pt') return `Termos de uso, IA, tratamento de dados e cibersegurança aceitos${date ? ` · ${date}` : ''}.`;
+      if (lang === 'fr') return `Conditions d’utilisation, IA, traitement des données et cybersécurité acceptées${date ? ` · ${date}` : ''}.`;
+      return `Términos de uso, IA, tratamiento de datos y ciberseguridad aceptados${date ? ` · ${date}` : ''}.`;
+    }
+    if (lang === 'en') return 'Current terms have not yet been accepted.';
+    if (lang === 'pt') return 'Os termos atuais ainda não foram aceitos.';
+    if (lang === 'fr') return 'Les conditions actuelles n’ont pas encore été acceptées.';
+    return 'Las condiciones actuales aún no han sido aceptadas.';
+  }
+
+  function renderConsentAccountStatus(status=consentState) {
+    consentState = status || consentState;
+    const userBox = document.querySelector('#user-box');
+    if (!userBox || !accessToken?.()) return;
+    let el = userBox.querySelector('.consent-account-status');
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'consent-account-status';
+      el.style.marginTop = '7px';
+      el.style.padding = '7px 8px';
+      el.style.borderRadius = '8px';
+      el.style.fontSize = '11px';
+      el.style.lineHeight = '1.35';
+      userBox.appendChild(el);
+    }
+    const accepted = !!consentState?.accepted;
+    el.textContent = `${accepted ? '✓ ' : '⚠ '}${localizedConsentStatus(consentState)}`;
+    el.style.background = accepted ? 'rgba(16,185,129,.12)' : 'rgba(245,158,11,.14)';
+    el.style.color = accepted ? '#a7f3d0' : '#fde68a';
+  }
+
+  function setupReturningUserConsentHint() {
+    const checkbox = document.querySelector('#signin-terms');
+    const oldLabel = checkbox?.closest('.consent-check');
+    if (oldLabel) oldLabel.style.display = 'none';
+    const pane = document.querySelector('#auth-signin');
+    if (!pane || pane.querySelector('#signin-consent-hint')) return;
+    const hint = document.createElement('div');
+    hint.id = 'signin-consent-hint';
+    hint.style.margin = '10px 0 14px';
+    hint.style.padding = '10px 12px';
+    hint.style.border = '1px solid #e4e7ec';
+    hint.style.borderRadius = '10px';
+    hint.style.background = '#f8fafc';
+    hint.style.fontSize = '12px';
+    hint.style.color = '#475467';
+    hint.innerHTML = '<span id="signin-consent-hint-text"></span> <button type="button" class="link-button open-consent-login"></button>';
+    const passwordLabel = document.querySelector('#signin-password')?.closest('label');
+    if (passwordLabel) passwordLabel.after(hint); else pane.prepend(hint);
+    hint.querySelector('.open-consent-login')?.addEventListener('click', () => modal(true,false));
+    updateReturningUserConsentHint();
+  }
+
+  function updateReturningUserConsentHint() {
+    const text = document.querySelector('#signin-consent-hint-text');
+    const link = document.querySelector('.open-consent-login');
+    if (!text || !link) return;
+    const lang = i18n()?.language?.() || 'es';
+    if (lang === 'en') {
+      text.textContent = 'Your acceptance is stored in your account. If the current version was already accepted, it will not be requested again.';
+      link.textContent = 'View terms';
+    } else if (lang === 'pt') {
+      text.textContent = 'Sua aceitação fica registrada na conta. Se a versão atual já foi aceita, não será solicitada novamente.';
+      link.textContent = 'Ver termos';
+    } else if (lang === 'fr') {
+      text.textContent = 'Votre acceptation est enregistrée dans votre compte. Si la version actuelle a déjà été acceptée, elle ne sera pas redemandée.';
+      link.textContent = 'Voir les conditions';
+    } else {
+      text.textContent = 'Tu aceptación queda registrada en tu cuenta. Si ya aceptaste la versión actual, no se solicitará nuevamente.';
+      link.textContent = 'Ver términos';
+    }
+  }
 
   function modal(show=true, forced=false) {
     consentRequired = forced;
@@ -44,12 +126,47 @@
     catch (e) { log?.('Consent status error', e.message); throw e; }
   }
 
+  async function recordConsent() {
+    const payload = {
+      terms_accepted:true,
+      ai_use_accepted:true,
+      data_processing_accepted:true,
+      cybersecurity_acknowledged:true,
+      scientific_responsibility_acknowledged:true,
+    };
+    const result = await api('/api/consent',{method:'POST',body:JSON.stringify(payload)});
+    if (!result.accepted) throw new Error('Consent was not recorded');
+    consentState = result;
+    renderConsentAccountStatus(result);
+    return result;
+  }
+
   async function ensureConsentGate() {
     if (!accessToken?.()) return false;
     const status = await consentStatus();
-    if (status.accepted) { modal(false); return true; }
+    consentState = status;
+    renderConsentAccountStatus(status);
+    if (status.accepted) {
+      modal(false);
+      return true;
+    }
     modal(true, true);
     return false;
+  }
+
+  function pendingSignupConsentEmail() {
+    try { return JSON.parse(localStorage.getItem('scibrain_pending_signup_consent') || 'null')?.email || ''; }
+    catch { return ''; }
+  }
+
+  function savePendingSignupConsent() {
+    const email = document.querySelector('#signup-email')?.value?.trim()?.toLowerCase();
+    if (!email) return;
+    localStorage.setItem('scibrain_pending_signup_consent', JSON.stringify({email,accepted_at:new Date().toISOString()}));
+  }
+
+  function clearPendingSignupConsent() {
+    localStorage.removeItem('scibrain_pending_signup_consent');
   }
 
   async function acceptConsent() {
@@ -60,24 +177,18 @@
     }
     if (!accessToken?.()) {
       const activeSignup = document.querySelector('#auth-signup')?.classList.contains('active');
-      const box = document.querySelector(activeSignup ? '#signup-terms' : '#signin-terms');
-      if (box) box.checked = true;
+      if (activeSignup) {
+        const box = document.querySelector('#signup-terms');
+        if (box) box.checked = true;
+      }
       modal(false);
       return;
     }
     try {
-      const payload = {
-        terms_accepted:true,
-        ai_use_accepted:true,
-        data_processing_accepted:true,
-        cybersecurity_acknowledged:true,
-        scientific_responsibility_acknowledged:true,
-      };
-      const result = await api('/api/consent',{method:'POST',body:JSON.stringify(payload)});
-      if (!result.accepted) throw new Error('Consent was not recorded');
+      const result = await recordConsent();
       consentRequired = false;
       modal(false);
-      translatedToast(i18n()?.language()==='es' ? 'Condiciones aceptadas.' : 'Consent accepted.');
+      translatedToast(i18n()?.language()==='es' ? 'Condiciones aceptadas y guardadas en tu cuenta.' : 'Consent accepted and saved to your account.');
     } catch (e) {
       translatedToast((i18n()?.language()==='es' ? 'No se pudo registrar la aceptación: ' : 'Could not record consent: ') + e.message, true);
     }
@@ -86,18 +197,27 @@
   if (originals.afterAuthentication) {
     afterAuthentication = async function() {
       await originals.afterAuthentication();
-      try { await ensureConsentGate(); }
-      catch (e) { modal(true, true); }
+      try {
+        const authenticatedEmail = String(state.authUser?.email || '').trim().toLowerCase();
+        const pendingEmail = pendingSignupConsentEmail();
+        if (pendingEmail && authenticatedEmail && pendingEmail === authenticatedEmail) {
+          const result = await recordConsent();
+          clearPendingSignupConsent();
+          consentRequired = false;
+          modal(false);
+          renderConsentAccountStatus(result);
+          return;
+        }
+        await ensureConsentGate();
+      } catch (e) {
+        log?.('Consent gate error', e.message);
+        translatedToast(i18n()?.language()==='es' ? 'No se pudo verificar el estado de aceptación de condiciones. Intenta nuevamente.' : 'Could not verify consent status. Please try again.', true);
+      }
     };
   }
 
   if (originals.signIn) {
     signIn = async function() {
-      if (!document.querySelector('#signin-terms')?.checked) {
-        setAuthMessage?.(i18n()?.language()==='es' ? 'Debes aceptar las condiciones de uso, IA, datos y ciberseguridad.' : 'You must accept the platform, AI, data and cybersecurity conditions.', true);
-        modal(true, false);
-        return;
-      }
       return originals.signIn();
     };
   }
@@ -109,6 +229,7 @@
         modal(true, false);
         return;
       }
+      savePendingSignupConsent();
       return originals.signUp();
     };
   }
@@ -308,20 +429,23 @@
   }
 
   document.addEventListener('scibrain:languagechange', () => {
+    updateReturningUserConsentHint();
+    renderConsentAccountStatus();
     renderFolderContext?.(); renderLibrary?.(); renderSession?.(); renderJobs?.();
     const active = document.querySelector('.nav.active')?.dataset.view || 'overview';
     setView?.(active);
   });
 
   window.addEventListener('DOMContentLoaded', () => {
+    setupReturningUserConsentHint();
     document.querySelectorAll('.open-consent').forEach(b => b.addEventListener('click', () => modal(true,false)));
     document.querySelector('#close-consent')?.addEventListener('click', () => { if(!consentRequired) modal(false); });
     document.querySelector('#cancel-consent')?.addEventListener('click', async () => { if(consentRequired) await signOut?.(); else modal(false); });
     document.querySelector('#accept-consent')?.addEventListener('click', acceptConsent);
     document.querySelector('#process-next-review')?.addEventListener('click', processNextReview);
     document.querySelector('#process-review-queue')?.addEventListener('click', processReviewQueue);
-    document.querySelector('#signin-terms')?.addEventListener('change', e => { if(e.target.checked) modal(true,false); });
     document.querySelector('#signup-terms')?.addEventListener('change', e => { if(e.target.checked) modal(true,false); });
     i18n()?.apply(document);
+    updateReturningUserConsentHint();
   });
 })();
