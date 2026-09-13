@@ -1,27 +1,110 @@
 # ScientificBrain
 
-ScientificBrain is an evidence-grounded scientific research operating system. Its first domain is plasma physics, but the architecture is intentionally independent of any single AI provider or model.
+ScientificBrain is an evidence-grounded scientific research operating system. Its first scientific domain is plasma physics, but its memory, agents, workflow and inference router are designed to remain independent of any single AI model or provider.
 
-The central design rule is simple: **scientific progress is represented by defined state, evidence, artifacts, uncertainty, gates and reproducible decisions — not by fluent prose.**
+The core rule is:
 
-## v0.4: everything important is explicit
+> Scientific progress is represented by defined state, evidence, artifacts, uncertainty, gates and reproducible decisions — not by fluent prose alone.
 
-ScientificBrain v0.4 introduces strict contracts for the research project itself. A project cannot begin as an undefined chat. It must define:
+## v0.6
+
+ScientificBrain 0.6 adds the multi-user research workspace required for production use:
+
+- Supabase Auth accounts;
+- Row Level Security per authenticated user;
+- editable research folders and nested folders;
+- year, research line and area metadata;
+- an independent paper corpus for each folder;
+- a configurable paper target, defaulting to 100;
+- private PDF storage in Supabase Storage;
+- strict folder-scoped scientific context;
+- paper deduplication by canonical ID, DOI and normalized title;
+- attachment of a manually obtained PDF to an existing metadata record;
+- Research Agent discovery across OpenAlex, arXiv, Crossref and optional general-web providers;
+- DOI/source preservation when full text is not available automatically;
+- incremental full-text review jobs suitable for Vercel;
+- Spanish as the default web-interface language;
+- English, Portuguese and French UI translations;
+- versioned acceptance of platform use, AI use, data processing, cybersecurity and scientific responsibility;
+- © 2026 Innova Space Edu SpA. All rights reserved.
+
+## User research workspace
+
+Each signed-in user owns an isolated hierarchy:
+
+```text
+User
+├── Research folder
+│   ├── year
+│   ├── research line
+│   ├── area
+│   ├── target paper count
+│   ├── nested folders
+│   ├── project(s)
+│   └── paper corpus
+│       ├── uploaded PDFs
+│       ├── discovered papers
+│       ├── DOI / source links
+│       └── deep-review state
+├── research sessions
+├── scientific artifacts
+├── Research Agent searches
+└── analysis jobs
+```
+
+The active folder is the scientific context boundary:
+
+```text
+agent context = project + active folder + active folder corpus
+```
+
+A session cannot silently switch to another folder. If the folder corpus changes, the active session corpus is synchronized to the current folder.
+
+## Authentication, privacy and consent
+
+Supabase Auth is the primary identity layer. The browser uses the Supabase publishable key plus the authenticated user's JWT. User-owned tables and the private paper bucket are protected by RLS policies using `auth.uid()`.
+
+ScientificBrain records acceptance by consent-policy version. The current consent covers:
+
+- use of the ScientificBrain platform;
+- use of configured AI providers;
+- processing and storage of user research data;
+- cybersecurity acknowledgement;
+- scientific responsibility for verifying AI-generated output;
+- confirmation that the user has sufficient rights or authorization to upload/process documents.
+
+The login and registration interface displays a detailed consent modal. The platform can require a new acceptance when the consent version changes.
+
+Do not put a Supabase secret/service-role key in browser code. Browser access uses only the publishable key and user JWT.
+
+## Multilingual web interface
+
+The website defaults to **Spanish**. Users can switch the interface to:
+
+- Spanish (`es`)
+- English (`en`)
+- Portuguese (`pt`)
+- French (`fr`)
+
+The language preference is stored locally in the browser and applies only to the ScientificBrain web interface. Scientific source documents are not automatically rewritten by this UI-language setting.
+
+## Defined scientific project
+
+A project cannot begin as an undefined chat. `ResearchProjectDefinition` requires explicit scientific structure, including:
 
 - scientific question, gap and rationale;
 - domain of validity;
-- objectives, observables, expected outputs and success criteria;
-- variables, units, roles, operational definitions and uncertainty definitions;
-- falsifiable hypotheses, mechanisms, predictions and rejection criteria;
-- theoretical models, governing equations, closures, approximations and limiting cases;
-- experimental design, controls, repetitions and acceptance criteria when applicable;
-- diagnostics, calibration, resolution, bandwidth, bias and limits of detection/quantification;
-- simulation model, solver, resolution, time integration, initial/boundary conditions, convergence and validation when applicable;
+- objectives, observables and expected outputs;
+- variables, units and operational definitions;
+- falsifiable hypotheses and rejection criteria;
+- theoretical models and governing equations;
+- experimental design and diagnostics when applicable;
+- numerical/simulation definition when applicable;
 - uncertainty sources and propagation;
 - explicit in-scope / out-of-scope boundaries;
 - required scientific outputs.
 
-`ResearchProjectDefinition` rejects cross-references to variables, hypotheses or diagnostics that were never defined.
+Undefined scientific references are rejected by the definition gate.
 
 ## Scientific protocol
 
@@ -40,11 +123,11 @@ The canonical protocol is defined in `config/research_protocol.yaml`:
 11. writing
 12. review
 
-Each stage declares required artifacts, gates and a completion rule. A stage does not advance because an LLM produced a convincing response.
+Each stage declares required artifacts, gates and a completion rule.
 
-## Defined agents
+## Specialized agents
 
-`config/agent_registry.yaml` defines specialized agents rather than one generic scientist:
+`config/agent_registry.yaml` defines specialized roles including:
 
 - Research Director
 - Literature
@@ -64,11 +147,7 @@ Each stage declares required artifacts, gates and a completion rule. A stage doe
 - Writer
 - Reviewer
 
-Every agent has one primary responsibility, explicit inputs, explicit outputs, required checks, an inference task and a `can_block` policy.
-
-Agents read structured `ResearchState` + latest research artifacts. They do not simply inherit the prose of the previous agent.
-
-## Self-critique and independent review
+Agents read structured `ResearchState` plus accepted research artifacts. They do not simply inherit the prose of the previous agent.
 
 Configured agents run through:
 
@@ -84,11 +163,9 @@ independent reviewer
 accepted artifact / blocked artifact
 ```
 
-When multiple cloud providers are configured, ScientificBrain rotates the provider order so the independent review attempts a different provider first. If only one provider exists, the review still runs as a separate role but does not claim provider independence.
+## Epistemic state
 
-## Epistemic status
-
-`config/epistemic_policy.yaml` defines:
+ScientificBrain distinguishes states such as:
 
 - observed
 - measured
@@ -100,269 +177,157 @@ When multiple cloud providers are configured, ScientificBrain rotates the provid
 - contradicted
 - unresolved
 
-Forbidden silent rewrites include:
+Silent rewrites such as `inferred -> measured` or `speculative -> observed` are forbidden.
+
+## Research Agent
+
+The Research Agent can discover scientific information from:
 
 ```text
-inferred     -> measured
-speculative  -> observed
-hypothesis   -> measured
+OpenAlex
+arXiv
+Crossref
+Unpaywall / open-access resolution
+optional Tavily general-web search
+optional Brave general-web search
 ```
 
-A confidence score never substitutes for epistemic status or evidence.
+For each candidate source it preserves available metadata such as title, authors, year, journal, DOI, arXiv ID, source URL, abstract and PDF URL.
 
-## Scientific artifacts
-
-Research outputs are versioned artifacts rather than loose chat messages. Examples:
+If full text cannot be resolved automatically, the record remains explicit:
 
 ```text
-project_definition
-literature_map
-contradiction_map
-evidence_records
-theory_review
-regime_map
-competing_hypotheses
-experiment_design
-diagnostic_plan
-uncertainty_budget
-simulation_plan
-raw_data_or_run_outputs
-processing_log
-statistical_results
-interpretation
-alternative_explanations
-adversarial_review
-reproducibility_report
-draft
-review_verdict
+access_status = manual_download / unavailable
+manual_lookup_required = true
+DOI = preserved when available
+source_url = preserved when available
 ```
 
-Artifacts record producer, stage, revision, evidence IDs and whether they passed independent review.
+The user can later obtain the paper through authorized means and attach the PDF to that same record instead of creating a duplicate.
 
-## 100-paper plasma corpus
+## Folder-scoped 100-paper corpus
 
-The first ScientificBrain memory target is **100 full-text, deeply reviewed plasma-physics papers**.
+The original plasma corpus target remains 100 deeply reviewed full-text papers, but v0.6 generalizes the concept to **each user's own research folder**.
 
-Metadata discovery or abstract review does **not** count toward the 100.
-
-`config/corpus_blueprint.yaml` defines 100 exclusive primary slots:
-
-| Primary area | Papers |
-| --- | ---: |
-| Fundamental kinetic theory | 10 |
-| MHD / resistive / Hall / extended-MHD | 10 |
-| Plasma shocks | 8 |
-| Magnetic reconnection | 8 |
-| Plasma focus and pinch | 8 |
-| Electric propulsion and PPT | 8 |
-| Diagnostics and metrology | 10 |
-| PIC/Vlasov/kinetic simulation | 8 |
-| Fluid/MHD simulation and verification | 6 |
-| Turbulence and transport | 6 |
-| Confinement and gyrokinetics | 6 |
-| Space and solar plasma | 4 |
-| Laser and high-energy-density plasma | 4 |
-| Low-temperature/discharge physics | 2 |
-| Uncertainty, validation and reproducibility | 2 |
-| **Total** | **100** |
-
-Every deeply reviewed paper must preserve the physical regime, equations/model, assumptions, methods, diagnostics, numerical conditions when applicable, uncertainty, results, claim-to-evidence links, limitations, alternatives, reproducibility information and unresolved questions.
-
-## Literature pipeline
-
-ScientificBrain can now run the corpus as incremental jobs suitable for serverless infrastructure:
+A user may have, for example:
 
 ```text
-discover_literature
-        ↓
-metadata candidates
-        ↓
+PF-PPT / CubeSat         target 100
+Magnetized shocks        target 120
+Magnetic reconnection    target 80
+Gyrokinetics             target 100
+```
+
+Metadata discovery and abstract review do **not** count as full-text deep review.
+
+Deep review preserves:
+
+- physical regime;
+- equations and model;
+- assumptions;
+- methods;
+- diagnostics;
+- numerical conditions where relevant;
+- uncertainty;
+- claim-to-evidence links;
+- limitations;
+- competing explanations;
+- reproducibility information;
+- unresolved questions.
+
+## Incremental review pipeline
+
+Vercel-friendly processing is job-based:
+
+```text
+folder corpus
+    ↓
 enqueue_selected_reviews
-        ↓
+    ↓
 review_paper × N
-        ↓
-PDF full text
-        ↓
+    ↓
+PDF/full text
+    ↓
 structured extraction
-        ↓
+    ↓
 general critic
-        ↓
-specialist reviews
-        ↓
+    ↓
+specialist reviewers
+    ↓
 evidence / provenance / reproducibility gates
-        ↓
+    ↓
 full_text_reviewed
 ```
 
-Full text can be resolved from arXiv or Unpaywall, or a `review_paper` job can receive an explicit PDF URL. A failed PDF resolution or failed analysis stays failed and is never counted as deep review.
+The web interface can run one paper at a time or process the pending queue sequentially while the page remains active.
 
 ## Cloud-first inference from EDUAI
 
-Cloud models are the default inference path. Local inference is optional.
+Online inference is the default. Local models are optional.
 
-Default routing:
+Typical routing:
 
-| Task | Provider order |
+| Task | Default order |
 | --- | --- |
 | research | Google/Gemini → Groq → OpenRouter |
-| text | Google/Gemini → Vertex placeholder → Groq → OpenRouter → Cerebras → Together |
-| structured | Google/Gemini → Vertex placeholder → Groq → OpenRouter → Cerebras → Together |
-| long context | Google/Gemini → Vertex placeholder → OpenRouter → Groq → Cerebras → Together |
+| text | Google/Gemini → Groq → OpenRouter → Cerebras → Together |
+| structured | Google/Gemini → Groq → OpenRouter → Cerebras → Together |
+| long context | Google/Gemini → OpenRouter → Groq → Cerebras → Together |
 | retrieval | Google/Gemini |
-| code | Google/Gemini → Vertex placeholder → Groq → Cerebras → OpenRouter → Together |
+| code | Google/Gemini → Groq → Cerebras → OpenRouter → Together |
 
-Providers without credentials are skipped.
+Providers without configured credentials are skipped.
 
-Current model defaults are configurable through environment variables; the scientific memory schema does not depend on model IDs.
+## Production persistence
 
-## Persistent production state
-
-SQLite/FTS5 remains the transparent local development baseline. It is not considered durable storage on Vercel.
-
-For Vercel production use:
+The production Supabase project is configured through environment variables:
 
 ```env
 SCIBRAIN_STORAGE_BACKEND=supabase
-SUPABASE_URL=...
-SUPABASE_SERVICE_ROLE_KEY=...
+SUPABASE_URL=https://cwbnvukerekgcedcyydd.supabase.co
+SUPABASE_PUBLISHABLE_KEY=...
 ```
 
-Run `migrations/supabase.sql` in the Supabase SQL editor first.
+A server-only secret key may be used for trusted maintenance jobs if needed, but it must never be exposed in browser code.
 
-The migration creates persistent tables for:
+Database migrations create and secure:
 
+- profiles;
+- research folders;
 - projects;
 - research states;
-- papers;
-- evidence;
-- research artifacts;
-- incremental jobs.
+- user folder papers;
+- research searches;
+- artifacts;
+- jobs;
+- versioned consent records;
+- private `scibrain-papers` storage.
 
-RLS is enabled and no public write policies are created. `SUPABASE_SERVICE_ROLE_KEY` is server-side only.
+## Vercel API layout
 
-## API security
-
-A public deployment should enable:
-
-```env
-SCIBRAIN_REQUIRE_API_TOKEN=true
-SCIBRAIN_API_TOKEN=<strong random secret>
-```
-
-Protected project/session/agent/artifact/job endpoints then require:
-
-```http
-Authorization: Bearer <token>
-```
-
-The web console stores a supplied access token only in browser `sessionStorage` for the current tab. This is an administrative protection layer; a future multi-user deployment should replace it with user authentication and per-project authorization.
-
-## Literature services
-
-Recommended:
-
-```env
-OPENALEX_MAILTO=research@example.org
-UNPAYWALL_EMAIL=research@example.org
-```
-
-Open-access PDF ingestion preserves page markers (`[[PAGE N]]`) so extracted evidence can retain page-level provenance.
-
-## Vercel web console
-
-The repository now contains a static research console at `/` plus Python serverless endpoints under `/api`.
-
-The console exposes:
-
-- system/provider/storage/security health;
-- canonical project-definition editor + validator;
-- persistent project creation;
-- active research state;
-- stage-specific agents;
-- one-agent-at-a-time execution for serverless safety;
-- explicit stage validation;
-- human/instrument artifacts;
-- literature discovery jobs;
-- incremental full-paper review jobs;
-- protocol and agent registry;
-- persistent project list.
-
-Useful endpoints:
+To avoid excessive Python Functions, the deployment uses four physical gateways:
 
 ```text
-GET  /api/health
-GET  /api/manifest
-GET  /api/project_schema
-GET  /api/project_template
-POST /api/validate_project
-GET/POST /api/projects
-GET  /api/session?session_id=...
-POST /api/run_agent
-POST /api/validate_stage
-POST /api/artifact
-GET/POST /api/jobs
-POST /api/run_job
+/api/meta.py
+/api/workspace.py
+/api/research.py
+/api/science.py
 ```
 
-## Vercel environment variables
+Public route names are preserved through `vercel.json` rewrites.
 
-Start from `.env.example`. At minimum for a persistent online deployment configure:
-
-```env
-SCIBRAIN_INFERENCE_MODE=cloud
-SCIBRAIN_STORAGE_BACKEND=supabase
-SCIBRAIN_REQUIRE_API_TOKEN=true
-SCIBRAIN_API_TOKEN=...
-SUPABASE_URL=...
-SUPABASE_SERVICE_ROLE_KEY=...
-
-GEMINI_API_KEY=...
-GROQ_API_KEY=...
-OPENROUTER_API_KEY=...
-
-OPENALEX_MAILTO=...
-UNPAYWALL_EMAIL=...
-```
-
-Cerebras, Together and additional OpenRouter/Together keys are optional fallbacks.
-
-## Local inference
-
-Ollama remains optional:
-
-```env
-SCIBRAIN_INFERENCE_MODE=ollama
-SCIBRAIN_OLLAMA_MODEL=qwen3:8b
-SCIBRAIN_OLLAMA_URL=http://127.0.0.1:11434
-```
-
-or as cloud fallback:
-
-```env
-SCIBRAIN_INFERENCE_MODE=cloud
-SCIBRAIN_ENABLE_LOCAL_FALLBACK=true
-```
-
-Do not point Vercel at `127.0.0.1` expecting it to reach a user's computer.
-
-## Local CLI
+## Development
 
 ```bash
-scientific-brain init-db
-scientific-brain provider-status --task research
-scientific-brain discover --max-results 100
-scientific-brain corpus-audit
-scientific-brain review-paper 'doi:10.xxxx/example' paper.txt
+pip install -e ".[dev]"
+pytest -q
+node --check assets/i18n.js
+node --check assets/app.js
+node --check assets/app_plus.js
 ```
 
-## Tests
+CI executes Python tests and JavaScript syntax checks for all three frontend scripts.
 
-```bash
-python -m pytest -q
-```
+---
 
-GitHub Actions runs tests on `main`, `feat/**` and pull requests to `main`.
-
-## Current scientific boundary
-
-ScientificBrain is a research-assistance and research-orchestration system. Its gates, agent reviews and memory improve traceability and criticism; they do not turn model output into experimental evidence. Claims become scientific evidence only through the defined source, derivation, simulation or measurement chain represented in the project state.
+© 2026 Innova Space Edu SpA. Todos los derechos reservados.
