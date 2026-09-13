@@ -6,6 +6,10 @@ from .agents_legacy import *  # noqa: F401,F403
 from . import agents_legacy as _legacy
 from .models import Critique, Paper, PaperAnalysis, PaperKind, SpecialistReview
 
+# Compatibility export required by graph_agents and other pre-v0.10 modules.
+# ``import *`` intentionally excludes underscore-prefixed names.
+_complete_model = _legacy._complete_model
+
 
 PAPER_SYSTEM = """You are ScientificBrain's discipline-agnostic Paper Agent.
 Extract the scientific content of the supplied paper without assuming a field in advance. Never
