@@ -135,6 +135,32 @@ class LiteratureWatchService:
     def _existing_keys(self) -> set[str]:
         return {result_key(row) for row in self.workspace.list_papers(self.folder_id)}
 
+    def _mark_research_stale(self, watch_id: str, new_count: int) -> None:
+        if new_count <= 0:
+            return
+        try:
+            rows = self.workspace._select(
+                "scibrain_research_documents",
+                {
+                    "folder_id": f"eq.{self.folder_id}",
+                    "select": "document_id,status",
+                    "limit": "1",
+                },
+            )
+            if not rows:
+                return
+            self.workspace._patch(
+                "scibrain_research_documents",
+                {"document_id": f"eq.{rows[0]['document_id']}"},
+                {
+                    "status": "stale_external_literature",
+                    "stale_reason": f"literature_watch:{watch_id}:{new_count}_new_leads",
+                    "updated_at": _iso_now(),
+                },
+            )
+        except Exception:
+            return
+
     def run_watch(self, watch_id: str) -> dict[str, Any]:
         watch = self._watch(watch_id)
         started = time.perf_counter()
@@ -183,6 +209,7 @@ class LiteratureWatchService:
                     "updated_at": _iso_now(),
                 },
             )
+            self._mark_research_stale(watch_id, len(new_results))
             self.usage.record(
                 "literature_watch_run",
                 duration_ms=duration_ms,
@@ -243,6 +270,33 @@ class LiteratureWatchCronRunner:
             },
         )
         return {result_key(row) for row in rows}
+
+    def _mark_research_stale(self, owner_id: str, folder_id: str, watch_id: str, new_count: int) -> None:
+        if new_count <= 0:
+            return
+        try:
+            rows = self._get(
+                "scibrain_research_documents",
+                {
+                    "owner_id": f"eq.{owner_id}",
+                    "folder_id": f"eq.{folder_id}",
+                    "select": "document_id,status",
+                    "limit": "1",
+                },
+            )
+            if not rows:
+                return
+            self._patch(
+                "scibrain_research_documents",
+                {"document_id": f"eq.{rows[0]['document_id']}"},
+                {
+                    "status": "stale_external_literature",
+                    "stale_reason": f"literature_watch:{watch_id}:{new_count}_new_leads",
+                    "updated_at": _iso_now(),
+                },
+            )
+        except Exception:
+            return
 
     def due_watches(self, limit: int = 2) -> list[dict[str, Any]]:
         rows = self._get(
@@ -324,6 +378,7 @@ class LiteratureWatchCronRunner:
                         "updated_at": _iso_now(),
                     },
                 )
+                self._mark_research_stale(owner_id, folder_id, watch_id, len(new_results))
                 processed.append({"watch_id": watch_id, "status": "ok", "new": len(new_results), "results": len(rows)})
             except Exception as exc:
                 try:
