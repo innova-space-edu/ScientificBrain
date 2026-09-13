@@ -26,3 +26,4 @@ jobs:
           node --check assets/i18n.js
           node --check assets/app.js
           node --check assets/app_plus.js
+          node --check assets/ux_flow.js

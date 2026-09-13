@@ -240,11 +240,20 @@ class UserSnapshotStore:
         response.raise_for_status()
         return url, response.content
 
-    def create_job(self, session_id: str, job_type: str, payload: dict[str, Any]) -> dict[str, Any]:
+    def create_job(
+        self,
+        session_id: str | None,
+        job_type: str,
+        payload: dict[str, Any],
+        *,
+        folder_id: str | None = None,
+    ) -> dict[str, Any]:
+        effective_folder = folder_id or self.folder_id
         row = {
             "job_id": f"job:{uuid.uuid4().hex}",
             "owner_id": self.user.user_id,
             "session_id": session_id,
+            "folder_id": effective_folder,
             "job_type": job_type,
             "status": "pending",
             "payload": payload,
@@ -256,14 +265,23 @@ class UserSnapshotStore:
         rows = self._select("scibrain_jobs", {"job_id": f"eq.{job_id}", "select": "*", "limit": "1"})
         return rows[0] if rows else None
 
-    def list_jobs(self, session_id: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
+    def list_jobs(
+        self,
+        session_id: str | None = None,
+        folder_id: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
         params = {"select": "*", "order": "created_at.desc", "limit": str(max(1, min(limit, 500)))}
         if session_id:
             params["session_id"] = f"eq.{session_id}"
+        if folder_id:
+            params["folder_id"] = f"eq.{folder_id}"
+        elif self.folder_id:
+            params["folder_id"] = f"eq.{self.folder_id}"
         return self._select("scibrain_jobs", params)
 
     def update_job(self, job_id: str, **updates: Any) -> None:
-        allowed = {"status", "progress", "last_error", "payload"}
+        allowed = {"status", "progress", "last_error", "payload", "folder_id"}
         payload = {key: value for key, value in updates.items() if key in allowed}
         if payload:
             self._patch("scibrain_jobs", {"job_id": f"eq.{job_id}"}, payload)
