@@ -1,0 +1,91 @@
+version: 1
+target: 100
+purpose: Build a broad but technically deep plasma-physics memory spanning experiment, theory, simulation, diagnostics, metrology and validation.
+
+# Primary slots are exclusive for corpus accounting and sum exactly to 100.
+# Papers may receive additional cross-domain tags after selection.
+primary_slots:
+  fundamental_kinetic_theory: 10
+  mhd_resistive_hall_extended: 10
+  plasma_shocks: 8
+  magnetic_reconnection: 8
+  plasma_focus_and_pinch: 8
+  electric_propulsion_and_ppt: 8
+  diagnostics_and_metrology: 10
+  pic_vlasov_kinetic_simulation: 8
+  fluid_mhd_simulation_and_verification: 6
+  turbulence_and_transport: 6
+  confinement_and_gyrokinetics: 6
+  space_and_solar_plasma: 4
+  laser_and_high_energy_density: 4
+  low_temperature_and_discharge_physics: 2
+  uncertainty_validation_and_reproducibility: 2
+
+method_requirements:
+  experimental_minimum: 30
+  theoretical_minimum: 20
+  simulation_minimum: 25
+  review_or_roadmap_minimum: 10
+  hybrid_minimum: 5
+
+source_requirements:
+  stable_identifier: required
+  full_text_for_deep_review: required
+  source_pointer_for_extracted_evidence: required
+  metadata_only_counts_as_deep_review: false
+  abstract_only_counts_as_deep_review: false
+  duplicate_scientific_work_counts_once: true
+  preprint_and_published_version_preference: published_version_when_substantively_equivalent
+
+analysis_requirements_per_paper:
+  - bibliographic_metadata
+  - scientific_question_or_purpose
+  - plasma_regime
+  - governing_physics
+  - equations_or_model
+  - assumptions_and_orderings
+  - experimental_parameters_if_applicable
+  - diagnostics_and_transfer_chain_if_applicable
+  - initial_and_boundary_conditions_if_applicable
+  - numerical_method_and_convergence_if_applicable
+  - uncertainty_and_error_sources
+  - primary_results
+  - claim_to_evidence_links
+  - limitations
+  - alternative_explanations
+  - reproducibility_information
+  - relation_to_other_corpus_papers
+  - unresolved_questions
+
+quality_gates:
+  evidence_gate: required
+  provenance_gate: required
+  reproducibility_gate: scored
+  specialist_review: required
+  adversarial_review: required
+  full_text_status: full_text_reviewed
+
+selection_priorities:
+  - relevance_to_plasma_physics
+  - physical_and_methodological_depth
+  - ability_to_teach_generalizable_reasoning
+  - experimental_or_numerical_reproducibility_value
+  - contradictory_or_boundary-case_value
+  - foundational_influence
+  - recent_state_of_the_art
+  - open_access_when_scientific_value_is_comparable
+
+anti_bias_rules:
+  - do_not_select_only_high_citation_consensus_papers
+  - include_negative_results_and_known_model_failures_when_available
+  - include_competing_theories_or_interpretations
+  - separate_review_articles_from_primary_evidence
+  - citation_count_is_not_evidence_strength
+  - repeated_citations_of_one_original_result_are_not_independent_evidence
+
+completion_definition:
+  total_deep_reviewed: 100
+  all_primary_slots_filled: true
+  all_required_gates_recorded: true
+  unresolved_contradictions_preserved: true
+  corpus_audit_passed: true

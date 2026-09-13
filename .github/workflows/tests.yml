@@ -2,7 +2,9 @@ name: ScientificBrain tests
 
 on:
   push:
-    branches: [main, feat/scientific-brain-v0]
+    branches:
+      - main
+      - 'feat/**'
   pull_request:
     branches: [main]
 
@@ -17,5 +19,10 @@ jobs:
           cache: pip
       - name: Install
         run: pip install -e ".[dev]"
-      - name: Test
+      - name: Python tests
         run: pytest -q
+      - name: Frontend JavaScript syntax
+        run: |
+          node --check assets/i18n.js
+          node --check assets/app.js
+          node --check assets/app_plus.js

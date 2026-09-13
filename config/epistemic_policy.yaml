@@ -1,0 +1,56 @@
+version: 1
+statuses:
+  observed:
+    meaning: Directly perceived or recorded event before inferential processing.
+    requires: [source_pointer]
+  measured:
+    meaning: Quantity obtained through a calibrated measurement chain.
+    requires: [source_pointer, measurement_method, uncertainty]
+  derived:
+    meaning: Quantity mathematically calculated from measured, observed or model inputs.
+    requires: [derivation, input_provenance]
+  inferred:
+    meaning: Interpretation supported by evidence but not directly measured.
+    requires: [supporting_evidence, assumptions]
+  supported:
+    meaning: Hypothesis or claim supported by multiple compatible evidence lines.
+    requires: [supporting_evidence, alternatives_considered]
+  hypothesis:
+    meaning: Falsifiable proposed explanation not yet established by the current project.
+    requires: [mechanism, prediction, rejection_criterion]
+  speculative:
+    meaning: Plausible idea with insufficient evidence or test definition.
+    requires: [explicit_speculation_label]
+  contradicted:
+    meaning: Claim or hypothesis conflicts with accepted evidence in the current research state.
+    requires: [contradicting_evidence]
+  unresolved:
+    meaning: Available evidence cannot discriminate between viable interpretations.
+    requires: [competing_explanations, missing_discriminator]
+rules:
+  - measured_cannot_be_created_from_inferred_without_measurement_chain
+  - derived_must_preserve_input_provenance
+  - supported_does_not_mean_proven
+  - repeated_model_output_is_not_independent_evidence
+  - confidence_score_never_replaces_evidence_status
+  - negative_and_null_results_are_preserved
+  - contradictions_are_not_silently_resolved
+  - missing_information_is_not_imputed_as_fact
+forbidden_rewrites:
+  - from: inferred
+    to: measured
+  - from: speculative
+    to: observed
+  - from: hypothesis
+    to: measured
+promotion_requirements:
+  hypothesis_to_supported:
+    - discriminating_evidence
+    - uncertainty_accounted
+    - viable_alternatives_considered
+  inferred_to_supported:
+    - independent_evidence_or_model_validation
+    - assumptions_explicit
+  observed_to_measured:
+    - calibrated_measurement_chain
+    - uncertainty_defined

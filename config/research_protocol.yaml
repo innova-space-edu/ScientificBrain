@@ -1,0 +1,73 @@
+version: 1
+name: ScientificBrain Research Protocol
+stages:
+  - id: definition
+    required_artifacts: [project_definition]
+    gates: [research_definition]
+    completion: Every variable, hypothesis, objective, scope boundary and required output is explicitly defined.
+  - id: literature
+    required_artifacts: [literature_map, evidence_records, contradiction_map]
+    gates: [corpus_coverage, provenance, evidence]
+    completion: The relevant literature landscape includes foundational, recent and contradictory work.
+  - id: theory
+    required_artifacts: [theory_review, regime_map, theoretical_predictions]
+    gates: [theory_consistency]
+    completion: Governing equations, assumptions, closures, limits and predictions are explicit.
+  - id: hypothesis
+    required_artifacts: [competing_hypotheses]
+    gates: [falsifiability]
+    completion: Each hypothesis has mechanism, observables, falsifiable prediction and rejection criterion.
+  - id: design
+    required_artifacts: [experiment_design, diagnostic_plan, uncertainty_budget, simulation_plan]
+    gates: [design_completeness, metrology, numerical_validation]
+    completion: Required experimental and/or numerical methods are sufficiently defined to execute or audit.
+  - id: execution
+    required_artifacts: [raw_data_or_run_outputs, run_log]
+    gates: [execution_traceability]
+    completion: Raw outputs and execution conditions are preserved without retrospective alteration.
+  - id: analysis
+    required_artifacts: [processing_log, processed_data, statistical_results]
+    gates: [analysis_reproducibility, uncertainty_propagation]
+    completion: Processing and statistical analysis are reproducible and uncertainty-aware.
+  - id: interpretation
+    required_artifacts: [interpretation, alternative_explanations]
+    gates: [claim_evidence_alignment]
+    completion: Direct observation, derivation, inference and speculation are explicitly distinguished.
+  - id: criticism
+    required_artifacts: [adversarial_review]
+    gates: [major_concerns_resolved]
+    completion: Major alternative mechanisms, regime mismatches and unsupported causal claims are resolved or retained as limitations.
+  - id: reproducibility
+    required_artifacts: [reproducibility_report]
+    gates: [reproducibility]
+    completion: Another group can identify all required parameters, software, diagnostics, calibrations, data and acceptance criteria.
+  - id: writing
+    required_artifacts: [draft]
+    gates: [writing_traceability]
+    completion: The draft introduces no scientific claim absent from accepted research state.
+  - id: review
+    required_artifacts: [review_verdict]
+    gates: [final_review]
+    completion: Reviewer verdict is pass, or revisions are routed to the responsible scientific stage.
+revision_routing:
+  theory: theory
+  literature: literature
+  evidence: literature
+  hypothesis: hypothesis
+  experiment: design
+  diagnostics: design
+  metrology: design
+  simulation: design
+  data: analysis
+  statistics: analysis
+  interpretation: interpretation
+  reproducibility: reproducibility
+  writing: writing
+hard_rules:
+  - no_claim_without_evidence_or_explicit_hypothesis_status
+  - no_inferred_result_may_be_rewritten_as_measured
+  - no_stage_passes_only_because_text_is_fluent
+  - no_agent_may_hide_missing_information
+  - negative_results_and_rejected_hypotheses_are_retained
+  - downstream_agents_use_structured_research_state
+  - final_writer_cannot_add_new_scientific_content

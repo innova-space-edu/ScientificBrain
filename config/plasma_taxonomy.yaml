@@ -1,31 +1,39 @@
 domains:
   fundamental_kinetic:
-    keywords: [vlasov, landau damping, kinetic instability, phase space, distribution function, boltzmann]
+    keywords: [vlasov, landau damping, kinetic instability, phase space, distribution function, boltzmann, dielectric function, plasma dispersion function]
   mhd:
-    keywords: [magnetohydrodynamic, mhd, resistive mhd, hall mhd, extended mhd, two-fluid]
+    keywords: [magnetohydrodynamic, mhd, ideal mhd, resistive mhd, hall mhd, extended mhd, two-fluid, generalized ohm law]
+  shocks:
+    keywords: [plasma shock, collisionless shock, collisional shock, magnetized shock, bow shock, shock compression, rankine-hugoniot]
   gyrokinetics:
     keywords: [gyrokinetic, gyrokinetics, drift wave, zonal flow, microturbulence]
   magnetic_reconnection:
-    keywords: [magnetic reconnection, current sheet, tearing mode, plasmoid]
+    keywords: [magnetic reconnection, current sheet, tearing mode, plasmoid, reconnection rate]
   turbulence_transport:
-    keywords: [plasma turbulence, turbulent transport, anomalous transport, cascade]
+    keywords: [plasma turbulence, turbulent transport, anomalous transport, cascade, intermittency]
   magnetic_confinement:
     keywords: [tokamak, stellarator, magnetic confinement, pedestal, divertor, edge plasma]
   space_solar:
-    keywords: [solar wind, magnetosphere, heliosphere, space plasma, solar plasma]
+    keywords: [solar wind, magnetosphere, heliosphere, space plasma, solar plasma, magnetosheath]
   laser_plasma:
     keywords: [laser plasma, wakefield, relativistic plasma, laser-plasma interaction]
   high_energy_density:
     keywords: [high energy density, hed plasma, inertial confinement, icf, warm dense matter]
   low_temperature:
-    keywords: [low temperature plasma, nonthermal plasma, atmospheric pressure plasma, glow discharge]
+    keywords: [low temperature plasma, nonthermal plasma, atmospheric pressure plasma, glow discharge, dielectric barrier discharge]
   dusty_plasma:
     keywords: [dusty plasma, complex plasma, charged dust]
+  plasma_focus_pinch:
+    keywords: [plasma focus, dense plasma focus, dpf, z pinch, z-pinch, current sheath, plasma sheath, rundown, pinch]
   propulsion:
-    keywords: [plasma propulsion, hall thruster, ion thruster, pulsed plasma thruster, ppt, pf-ppt]
+    keywords: [plasma propulsion, hall thruster, ion thruster, pulsed plasma thruster, ppt, pf-ppt, vacuum arc thruster, electric propulsion]
   diagnostics:
-    keywords: [thomson scattering, langmuir probe, interferometry, spectroscopy, magnetic probe, bolometry, reflectometry]
+    keywords: [thomson scattering, langmuir probe, interferometry, spectroscopy, magnetic probe, b-dot, bolometry, reflectometry, shadowgraphy, schlieren, fast imaging]
+  metrology_uncertainty:
+    keywords: [measurement uncertainty, uncertainty propagation, calibration, metrology, detection limit, quantification limit, repeatability, reproducibility]
   numerical_methods:
-    keywords: [particle-in-cell, pic, finite volume, finite element, discontinuous galerkin, spectral method, vlasov solver]
+    keywords: [particle-in-cell, pic, finite volume, finite element, discontinuous galerkin, spectral method, vlasov solver, hybrid-pic, mhd simulation]
+  verification_validation:
+    keywords: [verification validation, code verification, solution verification, convergence study, grid convergence, benchmark, numerical uncertainty]
   machine_learning:
     keywords: [machine learning plasma, neural network plasma, physics-informed neural network, surrogate model]

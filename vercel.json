@@ -1,0 +1,45 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "cleanUrls": true,
+  "functions": {
+    "api/meta.py": { "maxDuration": 30 },
+    "api/workspace.py": { "maxDuration": 60 },
+    "api/research.py": { "maxDuration": 60 },
+    "api/science.py": { "maxDuration": 60 }
+  },
+  "rewrites": [
+    { "source": "/api/health", "destination": "/api/meta?op=health" },
+    { "source": "/api/manifest", "destination": "/api/meta?op=manifest" },
+    { "source": "/api/client_config", "destination": "/api/meta?op=client_config" },
+    { "source": "/api/project_schema", "destination": "/api/meta?op=project_schema" },
+    { "source": "/api/project_template", "destination": "/api/meta?op=project_template" },
+    { "source": "/api/validate_project", "destination": "/api/meta?op=validate_project" },
+
+    { "source": "/api/consent", "destination": "/api/workspace?op=consent" },
+    { "source": "/api/sync_context", "destination": "/api/workspace?op=sync_context" },
+    { "source": "/api/attach_pdf", "destination": "/api/workspace?op=attach_pdf" },
+    { "source": "/api/folders", "destination": "/api/workspace?op=folders" },
+    { "source": "/api/library", "destination": "/api/workspace?op=library" },
+    { "source": "/api/projects", "destination": "/api/workspace?op=projects" },
+    { "source": "/api/session", "destination": "/api/workspace?op=session" },
+
+    { "source": "/api/research_search", "destination": "/api/research?op=research_search" },
+    { "source": "/api/jobs", "destination": "/api/research?op=jobs" },
+    { "source": "/api/run_job", "destination": "/api/research?op=run_job" },
+
+    { "source": "/api/run_agent", "destination": "/api/science?op=run_agent" },
+    { "source": "/api/validate_stage", "destination": "/api/science?op=validate_stage" },
+    { "source": "/api/artifact", "destination": "/api/science?op=artifact" }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "Referrer-Policy", "value": "no-referrer" },
+        { "key": "Cache-Control", "value": "no-store" }
+      ]
+    }
+  ]
+}
