@@ -16,6 +16,8 @@ from .agents import (
 from .artifacts import ArtifactRecord, LocalArtifactStore
 from .cloud_papers import CloudPaperService
 from .gates import run_paper_gates
+from .graph_agents import ContradictionAgent
+from .graph_models import ContradictionRecord, GraphNodeType
 from .graph_service import ScientificGraphService
 from .graph_store import ScientificGraphStore
 from .memory import ScientificMemory
@@ -149,12 +151,7 @@ class ScientificJobProcessor:
         return {"discovered": len(paper_ids), "paper_ids": paper_ids}
 
     def _review_paper(self, job: dict[str, Any]) -> dict[str, Any]:
-        """Advance exactly one resumable review step.
-
-        Large PDFs are never forced through one serverless invocation. Each call
-        performs one bounded unit of scientific work and persists enough progress
-        to continue on the next call.
-        """
+        """Advance exactly one resumable paper-review step."""
 
         session_id = job.get("session_id")
         payload = job.get("payload") or {}
@@ -167,7 +164,7 @@ class ScientificJobProcessor:
         service = CloudPaperService(self.memory, self.provider, self.snapshot_store)
 
         if phase == "prepare":
-            paper, document = service.load_document(paper_id, pdf_url=payload.get("pdf_url"))
+            _, document = service.load_document(paper_id, pdf_url=payload.get("pdf_url"))
             profile = profile_document(page.text for page in document.pages)
             plan = plan_review(profile)
             return {
@@ -219,7 +216,6 @@ class ScientificJobProcessor:
                 paper.kind = merged.inferred_kind
             self.memory.upsert_paper(paper)
             self.memory.save_analysis(merged)
-            self.snapshot_store.save_paper_bundle(paper, merged)
             current.pop("chunk_analyses", None)
             current.update({
                 "analysis": merged.model_dump(mode="json"),
@@ -237,7 +233,6 @@ class ScientificJobProcessor:
 
         if phase == "critique":
             critique = CriticAgent(_for_task(self.provider, "research")).critique_structured(paper, analysis)
-            self.snapshot_store.save_paper_bundle(paper, analysis, critique, [])
             agents = _specialist_agents(self.provider, paper.kind)
             current.update({
                 "critique": critique.model_dump(mode="json"),
@@ -259,7 +254,6 @@ class ScientificJobProcessor:
             if index < len(agents):
                 review = agents[index].review(paper, analysis)  # type: ignore[attr-defined]
                 reviews.append(review)
-                self.snapshot_store.save_paper_bundle(paper, analysis, critique, reviews)
                 current.update({
                     "specialist_reviews": [x.model_dump(mode="json") for x in reviews],
                     "specialist_index": index + 1,
@@ -340,13 +334,11 @@ class ScientificJobProcessor:
             "evidence_warning": corpus.evidence_warning,
         }
 
-    def _graph_service(self, job: dict[str, Any]) -> tuple[Any, ScientificGraphService]:
+    def _graph_service(self, job: dict[str, Any]) -> tuple[Any | None, ScientificGraphService]:
         session_id = job.get("session_id")
-        if not session_id:
-            raise ValueError(f"{job['job_type']} requires a research session")
-        state = self._state(session_id)
+        state = self._state(session_id) if session_id else None
         user = getattr(self.snapshot_store, "user", None)
-        folder_id = getattr(self.snapshot_store, "folder_id", None) or state.folder_id
+        folder_id = getattr(self.snapshot_store, "folder_id", None) or (state.folder_id if state else None)
         if user is None or not folder_id:
             raise RuntimeError("Scientific graph jobs require an authenticated user and folder-scoped snapshot store")
         graph_store = ScientificGraphStore(user, folder_id=folder_id)
@@ -363,12 +355,13 @@ class ScientificJobProcessor:
         state, service = self._graph_service(job)
         payload = job.get("payload") or {}
         result = service.build(full_text_only=bool(payload.get("full_text_only", True)))
-        state.audit_log.append(AuditEvent(
-            event="scientific_graph_built",
-            detail=f"nodes={len(result.nodes)}; edges={len(result.edges)}; papers={result.paper_count}",
-        ))
-        self.memory.save_state(state)
-        self.snapshot_store.save_state(state, project_id=state.project_id)
+        if state is not None:
+            state.audit_log.append(AuditEvent(
+                event="scientific_graph_built",
+                detail=f"nodes={len(result.nodes)}; edges={len(result.edges)}; papers={result.paper_count}",
+            ))
+            self.memory.save_state(state)
+            self.snapshot_store.save_state(state, project_id=state.project_id)
         return {
             "papers": result.paper_count,
             "claims": result.claim_count,
@@ -380,29 +373,90 @@ class ScientificJobProcessor:
     def _detect_contradictions(self, job: dict[str, Any]) -> dict[str, Any]:
         state, service = self._graph_service(job)
         payload = job.get("payload") or {}
-        rows = service.detect_contradictions(context=str(payload.get("context") or ""))
-        state.audit_log.append(AuditEvent(
-            event="contradictions_analyzed",
-            detail=f"candidates={len(rows)}",
-        ))
-        self.memory.save_state(state)
-        self.snapshot_store.save_state(state, project_id=state.project_id)
+        current = dict(job.get("progress") or {})
+        phase = str(current.get("phase") or "prepare")
+        context = str(payload.get("context") or "")
+
+        if phase == "prepare":
+            nodes = service.graph_store.list_nodes(limit=10000)
+            claims = [n for n in nodes if n.node_type == GraphNodeType.CLAIM]
+            papers = [n for n in nodes if n.node_type == GraphNodeType.PAPER]
+            if len(claims) < 2:
+                service.graph_store.replace_contradictions([])
+                return {"phase": "completed", "contradictions": 0, "candidate_ids": []}
+            batches = service._topic_claim_groups(claims, papers)
+            return {
+                "__job_status": "pending",
+                "phase": "scan",
+                "batch_index": 0,
+                "batch_node_ids": [[node.node_id for node in batch] for batch in batches],
+                "records": [],
+                "batch_count": len(batches),
+            }
+
+        if phase == "scan":
+            batches = current.get("batch_node_ids") or []
+            index = int(current.get("batch_index") or 0)
+            if index >= len(batches):
+                current["phase"] = "finalize"
+                current["__job_status"] = "pending"
+                return current
+
+            nodes = service.graph_store.list_nodes(limit=10000)
+            node_by_id = {n.node_id: n for n in nodes}
+            batch = [node_by_id[node_id] for node_id in batches[index] if node_id in node_by_id]
+            detected = ContradictionAgent(_for_task(self.provider, "research")).detect(batch, context=context)
+            records = list(current.get("records") or [])
+            records.extend(item.model_dump(mode="json") for item in detected)
+            current.update({
+                "records": records,
+                "batch_index": index + 1,
+                "phase": "finalize" if index + 1 >= len(batches) else "scan",
+                "__job_status": "pending",
+            })
+            return current
+
+        if phase != "finalize":
+            raise ValueError(f"Unknown contradiction phase: {phase}")
+
+        by_pair: dict[tuple[str, str], ContradictionRecord] = {}
+        for payload_row in current.get("records") or []:
+            item = ContradictionRecord.model_validate(payload_row)
+            pair = tuple(sorted((item.claim_a_id, item.claim_b_id)))
+            previous = by_pair.get(pair)
+            if previous is None or item.confidence > previous.confidence:
+                by_pair[pair] = item
+        rows = sorted(by_pair.values(), key=lambda x: x.confidence, reverse=True)
+        service.graph_store.replace_contradictions(rows)
+
+        if state is not None:
+            state.audit_log.append(AuditEvent(
+                event="contradictions_analyzed",
+                detail=f"candidates={len(rows)}",
+            ))
+            self.memory.save_state(state)
+            self.snapshot_store.save_state(state, project_id=state.project_id)
         return {
+            "phase": "completed",
             "contradictions": len(rows),
             "candidate_ids": [row.contradiction_id for row in rows],
+            "batches_processed": int(current.get("batch_count") or 0),
         }
 
     def _generate_hypotheses(self, job: dict[str, Any]) -> dict[str, Any]:
         state, service = self._graph_service(job)
         payload = job.get("payload") or {}
-        question = str(payload.get("question") or state.question)
+        question = str(payload.get("question") or (state.question if state is not None else "")).strip()
+        if not question:
+            raise ValueError("generate_competing_hypotheses requires payload.question when no session is attached")
         competition = service.generate_hypotheses(question)
-        state.audit_log.append(AuditEvent(
-            event="competing_hypotheses_generated",
-            detail=f"competition={competition.competition_id}; hypotheses={len(competition.hypotheses)}",
-        ))
-        self.memory.save_state(state)
-        self.snapshot_store.save_state(state, project_id=state.project_id)
+        if state is not None:
+            state.audit_log.append(AuditEvent(
+                event="competing_hypotheses_generated",
+                detail=f"competition={competition.competition_id}; hypotheses={len(competition.hypotheses)}",
+            ))
+            self.memory.save_state(state)
+            self.snapshot_store.save_state(state, project_id=state.project_id)
         return {
             "competition_id": competition.competition_id,
             "hypotheses": len(competition.hypotheses),

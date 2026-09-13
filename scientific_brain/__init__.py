@@ -1,3 +1,3 @@
-"""ScientificBrain: evidence-grounded scientific memory for plasma physics."""
+"""ScientificBrain: evidence-grounded scientific memory and reasoning."""
 
-__version__ = "0.9.0"
+__version__ = "0.10.0"

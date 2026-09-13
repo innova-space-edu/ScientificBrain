@@ -58,25 +58,33 @@ def _ranges(page_count: int, pages_per_chunk: int) -> tuple[tuple[int, int], ...
     return tuple(result)
 
 
+def _bounded_pages(profile: DocumentProfile, base_pages: int, target_tokens: int = 12000) -> int:
+    average = max(1, profile.estimated_tokens // max(1, profile.page_count))
+    token_bounded = max(1, target_tokens // average)
+    return max(1, min(base_pages, token_bounded))
+
+
 def plan_review(profile: DocumentProfile) -> ReviewPlan:
     """Select a bounded strategy from both page count and extracted-text size."""
 
     if profile.page_count <= 12 and profile.estimated_tokens <= 24000:
+        pages = max(1, profile.page_count)
         return ReviewPlan(
             mode="direct",
-            pages_per_chunk=max(1, profile.page_count),
-            chunk_ranges=_ranges(profile.page_count, max(1, profile.page_count)),
+            pages_per_chunk=pages,
+            chunk_ranges=_ranges(profile.page_count, pages),
             rationale="Short paper: one full-context extraction preserves cross-section relationships.",
         )
     if profile.page_count <= 35 and profile.estimated_tokens <= 65000:
-        pages = 8
+        pages = _bounded_pages(profile, 8)
         return ReviewPlan(
             mode="sectional",
             pages_per_chunk=pages,
             chunk_ranges=_ranges(profile.page_count, pages),
             rationale="Medium paper: section-sized extraction prevents provider/context overflow.",
         )
-    pages = 6 if profile.page_count <= 80 else 5
+    base = 6 if profile.page_count <= 80 else 5
+    pages = _bounded_pages(profile, base)
     return ReviewPlan(
         mode="hierarchical",
         pages_per_chunk=pages,

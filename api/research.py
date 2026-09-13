@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import os
 import signal
+import threading
+import time
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 
@@ -15,26 +17,28 @@ from scientific_brain.web_runtime import temporary_memory
 from scientific_brain.workspaces import UserWorkspaceStore
 
 
-class SoftJobTimeout(TimeoutError):
-    """Raised before the hosting platform hard-kills a long research request."""
+class SoftJobTimeout(BaseException):
+    """Control-flow sentinel raised before the hosting platform hard timeout.
+
+    It intentionally derives from BaseException so broad provider/application
+    ``except Exception`` failover handlers cannot swallow the deadline signal.
+    """
 
 
 def _run_with_soft_timeout(callback, seconds: int):
-    """Run a job with a recoverable timeout when SIGALRM is available.
-
-    Vercel terminates a Python Function abruptly at its hard duration limit. If
-    that happens while a job is marked ``running``, the request cannot execute
-    cleanup code. This alarm fires earlier, allowing the API to put the job back
-    into ``pending`` so the user can retry instead of receiving a raw 504.
-    """
-
-    if not hasattr(signal, "SIGALRM") or not hasattr(signal, "setitimer"):
+    can_alarm = (
+        seconds > 0
+        and hasattr(signal, "SIGALRM")
+        and hasattr(signal, "setitimer")
+        and threading.current_thread() is threading.main_thread()
+    )
+    if not can_alarm:
         return callback()
 
     previous_handler = signal.getsignal(signal.SIGALRM)
 
     def _raise_timeout(_signum, _frame):
-        raise SoftJobTimeout(f"Research job exceeded the {seconds}s soft execution budget")
+        raise SoftJobTimeout(f"Research job exceeded the {seconds}s remaining execution budget")
 
     signal.signal(signal.SIGALRM, _raise_timeout)
     signal.setitimer(signal.ITIMER_REAL, seconds)
@@ -45,18 +49,16 @@ def _run_with_soft_timeout(callback, seconds: int):
         signal.signal(signal.SIGALRM, previous_handler)
 
 
-def _job_soft_timeout_seconds() -> int:
+def _job_deadline_seconds() -> int:
     try:
-        requested = int(os.getenv("SCIBRAIN_JOB_SOFT_TIMEOUT_SECONDS", "280"))
+        requested = int(os.getenv("SCIBRAIN_JOB_SOFT_DEADLINE_SECONDS", "225"))
     except ValueError:
-        requested = 280
-    # Keep enough time for Supabase status recovery before Vercel's 300s cap.
-    return max(30, min(requested, 280))
+        requested = 225
+    # Reserve at least ~60 s of a 300 s function for status recovery and response I/O.
+    return max(60, min(requested, 240))
 
 
 def _configure_research_provider_timeout() -> None:
-    """Bound individual provider waits so failover cannot consume the whole job."""
-
     if "EDUAI_AI_PROVIDER_TIMEOUT_MS" not in os.environ:
         os.environ["EDUAI_AI_PROVIDER_TIMEOUT_MS"] = os.getenv(
             "SCIBRAIN_RESEARCH_PROVIDER_TIMEOUT_MS",
@@ -105,6 +107,7 @@ class handler(BaseHTTPRequestHandler):
             self._write(500, {"error": type(exc).__name__, "detail": str(exc)})
 
     def do_POST(self):
+        invocation_started = time.monotonic()
         user = require_user(self)
         if not user:
             return
@@ -201,12 +204,14 @@ class handler(BaseHTTPRequestHandler):
                 store = UserSnapshotStore(user, folder_id=str(folder_id))
                 _configure_research_provider_timeout()
                 provider = provider_from_env("cloud", task="research")
-                timeout_seconds = _job_soft_timeout_seconds()
+                deadline = _job_deadline_seconds()
+                elapsed = int(time.monotonic() - invocation_started)
+                remaining = max(1, deadline - elapsed)
                 try:
                     with temporary_memory() as memory:
                         result = _run_with_soft_timeout(
                             lambda: ScientificJobProcessor(memory, provider, store).run(job_id),
-                            timeout_seconds,
+                            remaining,
                         )
                 except SoftJobTimeout as exc:
                     current = store.get_job(job_id) or job
@@ -214,15 +219,15 @@ class handler(BaseHTTPRequestHandler):
                     progress.update({
                         "retryable": True,
                         "reason": "soft_timeout",
-                        "soft_timeout_seconds": timeout_seconds,
+                        "soft_deadline_seconds": deadline,
                     })
                     store.update_job(
                         job_id,
                         status="pending",
                         progress=progress,
                         last_error=(
-                            f"SoftJobTimeout: {exc}. The job was preserved and can be retried; "
-                            "the platform request was stopped before its hard timeout."
+                            f"SoftJobTimeout: {exc}. Progress was preserved and the job can resume "
+                            "from its last checkpoint."
                         ),
                     )
                     recovered = store.get_job(job_id) or current

@@ -1,11 +1,14 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
+  "fluid": true,
   "functions": {
     "api/meta.py": { "maxDuration": 30 },
     "api/workspace.py": { "maxDuration": 60 },
     "api/research.py": { "maxDuration": 300 },
-    "api/science.py": { "maxDuration": 300 }
+    "api/science.py": { "maxDuration": 300 },
+    "api/orchestrate.py": { "maxDuration": 300 },
+    "api/collaboration.py": { "maxDuration": 300 }
   },
   "rewrites": [
     { "source": "/api/health", "destination": "/api/meta?op=health" },
