@@ -20,7 +20,7 @@ def test_doi_cleanup():
     assert _clean_doi("https://doi.org/10.1000/test") == "10.1000/test"
 
 
-def test_manual_lookup_includes_doi_and_link():
+def test_manual_lookup_includes_doi_and_explains_unconfirmed_oa():
     msg = _manual_message({"doi": "10.1000/test", "url": "https://example.org/paper"})
     assert "10.1000/test" in msg
-    assert "source link" in msg
+    assert "Open Access no confirmado" in msg
