@@ -4,7 +4,7 @@ import os
 from dataclasses import dataclass
 
 from .discovery import OpenAlexClient
-from .fulltext import FullTextDocument, extract_pdf_bytes, fetch_pdf, ingest_open_access_paper
+from .fulltext import FullTextDocument, extract_pdf_bytes, fetch_pdf, resolve_open_access_pdf
 from .memory import ScientificMemory
 from .models import Paper, ReviewDepth
 from .paper_memory import PaperMemoryStore
@@ -54,32 +54,45 @@ class CloudPaperService:
         return PaperMemoryStore(user, str(folder_id))
 
     def load_document(self, paper_id: str, *, pdf_url: str | None = None) -> tuple[Paper, FullTextDocument]:
-        """Resolve one PDF, persist its extracted pages once, and reuse them thereafter."""
-
+        """Resolve one PDF, persist its extracted text/structure once, and reuse it thereafter."""
         paper = self.memory.get_paper(paper_id) or self.load_cloud_paper(paper_id)
         cache = self._paper_memory()
         if cache:
             cached = cache.load_document(paper_id)
             if cached is not None:
+                status = cache.status(paper_id)
+                if not status.get("indexed_at"):
+                    try:
+                        from .paper_intelligence import PaperIntelligenceStore
+                        PaperIntelligenceStore(cache.user, cache.folder_id).index_document(cached)
+                    except Exception:
+                        pass
                 return paper, cached
 
+        raw_data: bytes | None = None
         if pdf_url:
-            data = fetch_pdf(pdf_url)
-            document = extract_pdf_bytes(paper.canonical_id, pdf_url, data)
+            raw_data = fetch_pdf(pdf_url)
+            document = extract_pdf_bytes(paper.canonical_id, pdf_url, raw_data)
         else:
             private_fetch = getattr(self.snapshot_store, "fetch_paper_pdf", None)
             private_pdf = private_fetch(paper_id) if callable(private_fetch) else None
             if private_pdf:
-                source_url, data = private_pdf
-                document = extract_pdf_bytes(paper.canonical_id, source_url, data)
+                source_url, raw_data = private_pdf
+                document = extract_pdf_bytes(paper.canonical_id, source_url, raw_data)
             else:
-                document = ingest_open_access_paper(
+                resolved = resolve_open_access_pdf(
                     paper,
                     unpaywall_email=os.getenv("UNPAYWALL_EMAIL"),
                 )
+                if not resolved:
+                    raise ValueError(
+                        "No open-access PDF could be resolved. Provide the paper PDF explicitly or configure UNPAYWALL_EMAIL."
+                    )
+                raw_data = fetch_pdf(resolved)
+                document = extract_pdf_bytes(paper.canonical_id, resolved, raw_data)
 
         if cache:
-            cache.save_document(document)
+            cache.save_document(document, pdf_bytes=raw_data)
         return paper, document
 
     def review_paper(self, paper_id: str, *, pdf_url: str | None = None):

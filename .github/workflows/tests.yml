@@ -25,6 +25,7 @@ jobs:
       - name: API import smoke test
         run: |
           python -c "import api.jobs, api.search, api.run_job, api.paper, api.research, api.science, api.collaboration, api.orchestrate"
+          python -c "import scientific_brain.paper_intelligence, scientific_brain.paper_compare, scientific_brain.research_versions, scientific_brain.vision_provider"
       - name: Frontend JavaScript syntax
         run: |
           node --check assets/i18n.js
@@ -37,3 +38,4 @@ jobs:
           node --check assets/adaptive_agents.js
           node --check assets/runtime_repair.js
           node --check assets/research_workspace_v11.js
+          node --check assets/research_workspace_v12.js

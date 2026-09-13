@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any
 
 from .auth import AuthenticatedUser
@@ -20,11 +21,7 @@ _STOPWORDS = {
 
 @dataclass
 class PaperMemoryStore:
-    """Persistent, user-scoped cache of extracted PDF text.
-
-    The cache stores the page-marked full text once. Page objects are reconstructed from
-    the markers when needed, avoiding a second full copy of large PDFs in JSONB.
-    """
+    """Persistent, user-scoped cache of extracted PDF text and structural intelligence."""
 
     user: AuthenticatedUser
     folder_id: str
@@ -69,7 +66,12 @@ class PaperMemoryStore:
             pages = [TextPage(page=1, text=full_text)]
         return pages
 
-    def save_document(self, document: FullTextDocument) -> dict[str, Any]:
+    def save_document(self, document: FullTextDocument, pdf_bytes: bytes | None = None) -> dict[str, Any]:
+        """Save text first, then build a reusable chunk/asset index.
+
+        Indexing is intentionally non-fatal: a paper remains readable even if an optional
+        layout/visual inventory step fails. The failure is recorded in asset_summary.
+        """
         full_text = document.text
         payload = {
             "owner_id": self.user.user_id,
@@ -82,16 +84,36 @@ class PaperMemoryStore:
             "char_count": len(full_text),
             "full_text": full_text,
             "pages": [],
-            "extraction_version": "pypdf-page-markers-v2",
+            "extraction_version": "pypdf+pymupdf-structure-v3",
         }
         existing = self.get(document.paper_id)
         if existing:
-            return self.workspace._patch(
+            saved = self.workspace._patch(
                 "scibrain_paper_memory",
                 {"memory_id": f"eq.{existing['memory_id']}"},
                 payload,
             )
-        return self.workspace._insert("scibrain_paper_memory", payload)
+        else:
+            saved = self.workspace._insert("scibrain_paper_memory", payload)
+
+        try:
+            from .paper_intelligence import PaperIntelligenceStore
+            PaperIntelligenceStore(self.user, self.folder_id).index_document(document, pdf_bytes=pdf_bytes)
+        except Exception as exc:
+            memory_id = (saved or {}).get("memory_id") or (existing or {}).get("memory_id")
+            if memory_id:
+                self.workspace._patch(
+                    "scibrain_paper_memory",
+                    {"memory_id": f"eq.{memory_id}"},
+                    {
+                        "asset_summary": {
+                            "index_error": f"{type(exc).__name__}: {exc}",
+                            "text_memory_available": True,
+                        },
+                        "indexed_at": datetime.now(timezone.utc).isoformat(),
+                    },
+                )
+        return self.get(document.paper_id) or saved
 
     def load_document(self, paper_id: str) -> FullTextDocument | None:
         row = self.get(paper_id)
@@ -139,5 +161,8 @@ class PaperMemoryStore:
             "char_count": row.get("char_count"),
             "content_hash": row.get("content_hash"),
             "source_url": row.get("source_url"),
+            "structure": row.get("structure") or {},
+            "asset_summary": row.get("asset_summary") or {},
+            "indexed_at": row.get("indexed_at"),
             "updated_at": row.get("updated_at"),
         }

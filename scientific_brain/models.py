@@ -132,7 +132,15 @@ class Critique(BaseModel):
 
 class SpecialistReview(BaseModel):
     paper_id: str
-    role: Literal["theory", "experiment", "simulation", "adversarial", "reproducibility"]
+    role: Literal[
+        "theory",
+        "experiment",
+        "simulation",
+        "mathematical",
+        "statistical",
+        "adversarial",
+        "reproducibility",
+    ]
     findings: list[str] = Field(default_factory=list)
     concerns: list[str] = Field(default_factory=list)
     missing_checks: list[str] = Field(default_factory=list)
