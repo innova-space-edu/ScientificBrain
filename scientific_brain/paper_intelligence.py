@@ -6,7 +6,6 @@ import os
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from io import BytesIO
 from typing import Any
 
 import httpx
@@ -17,9 +16,9 @@ from .models import Paper
 from .user_snapshot import UserSnapshotStore
 from .workspaces import UserWorkspaceStore
 
-try:  # Optional at import time; installed in web/runtime dependencies.
+try:
     import fitz  # type: ignore
-except Exception:  # pragma: no cover - graceful fallback for minimal environments
+except Exception:  # pragma: no cover
     fitz = None
 
 
@@ -37,6 +36,12 @@ _STOPWORDS = {
     "una", "unos", "unas", "para", "con", "del", "los", "las", "que", "por", "como", "sobre", "entre",
     "what", "which", "where", "when", "cual", "cuáles", "donde", "cuando", "cómo", "qué", "desde", "hasta",
 }
+_DERIVED_ASSET_TYPES = (
+    "figure_caption",
+    "table_caption",
+    "equation_candidate",
+    "visual_page_inventory",
+)
 
 
 def _hash(text: str | bytes) -> str:
@@ -234,8 +239,6 @@ class PaperIntelligenceStore:
     def _bulk_insert(self, table: str, rows: list[dict[str, Any]], batch_size: int = 40) -> None:
         if not rows:
             return
-        # Keep PostgREST requests bounded even for very large papers. A single huge JSON
-        # payload is more likely to hit function/network limits than several idempotent batches.
         for start in range(0, len(rows), max(1, batch_size)):
             batch = rows[start : start + batch_size]
             response = httpx.post(
@@ -256,9 +259,15 @@ class PaperIntelligenceStore:
         self.workspace._delete("scibrain_paper_chunks", {
             "folder_id": f"eq.{self.folder_id}", "paper_id": f"eq.{document.paper_id}",
         })
-        self.workspace._delete("scibrain_paper_assets", {
-            "folder_id": f"eq.{self.folder_id}", "paper_id": f"eq.{document.paper_id}",
-        })
+        # Rebuild only deterministic assets. Persisted OCR and model-generated visual analyses are
+        # provenance artifacts and must survive a same-source reindex. A source replacement deletes
+        # all assets through the database invalidation trigger.
+        for asset_type in _DERIVED_ASSET_TYPES:
+            self.workspace._delete("scibrain_paper_assets", {
+                "folder_id": f"eq.{self.folder_id}",
+                "paper_id": f"eq.{document.paper_id}",
+                "asset_type": f"eq.{asset_type}",
+            })
 
         owner_id = self.user.user_id
         self._bulk_insert("scibrain_paper_chunks", [
@@ -273,11 +282,7 @@ class PaperIntelligenceStore:
         counts: dict[str, int] = {}
         for item in assets:
             counts[item["asset_type"]] = counts.get(item["asset_type"], 0) + 1
-        summary = {
-            **counts,
-            "chunks": len(chunks),
-            "visual": visual_summary,
-        }
+        summary = {**counts, "chunks": len(chunks), "visual": visual_summary}
         memory_rows = self.workspace._select("scibrain_paper_memory", {
             "folder_id": f"eq.{self.folder_id}", "paper_id": f"eq.{document.paper_id}",
             "select": "memory_id", "limit": "1",
@@ -324,13 +329,9 @@ class PaperIntelligenceStore:
             response.raise_for_status()
             rows = response.json()
         except httpx.HTTPError:
-            # Symbols and field-specific notation can be awkward for websearch_to_tsquery.
-            # Retrieval must remain available through the deterministic lexical fallback.
             rows = []
         if rows:
             return rows
-
-        # Fallback for equations, symbols, and very short queries that FTS may tokenize poorly.
         all_rows = self.workspace._select("scibrain_paper_chunks", {
             "folder_id": f"eq.{self.folder_id}", "paper_id": f"eq.{paper_id}",
             "select": "chunk_id,chunk_index,page_start,page_end,section_label,kind,text",
@@ -378,7 +379,6 @@ def resolve_pdf_bytes(user: AuthenticatedUser, folder_id: str, paper_id: str) ->
     private_pdf = snapshot.fetch_paper_pdf(paper_id)
     if private_pdf:
         return private_pdf
-
     workspace = UserWorkspaceStore(user)
     rows = workspace._select("scibrain_folder_papers", {
         "folder_id": f"eq.{folder_id}", "canonical_id": f"eq.{paper_id}",

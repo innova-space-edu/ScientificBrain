@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -67,10 +68,10 @@ class PaperMemoryStore:
         return pages
 
     def save_document(self, document: FullTextDocument, pdf_bytes: bytes | None = None) -> dict[str, Any]:
-        """Save text first, then build a reusable chunk/asset index.
+        """Save text, structural intelligence, then a bounded semantic index.
 
-        Indexing is intentionally non-fatal: a paper remains readable even if an optional
-        layout/visual inventory step fails. The failure is recorded in asset_summary.
+        Structural and semantic indexing are deliberately non-fatal. A paper remains usable through
+        persistent text and keyword retrieval even when an optional provider is unavailable.
         """
         full_text = document.text
         payload = {
@@ -84,7 +85,7 @@ class PaperMemoryStore:
             "char_count": len(full_text),
             "full_text": full_text,
             "pages": [],
-            "extraction_version": "pypdf+pymupdf-structure-v3",
+            "extraction_version": "pypdf+pymupdf+semantic-v4",
         }
         existing = self.get(document.paper_id)
         if existing:
@@ -113,6 +114,16 @@ class PaperMemoryStore:
                         "indexed_at": datetime.now(timezone.utc).isoformat(),
                     },
                 )
+
+        try:
+            from .semantic_retrieval import SemanticPaperRetrieval
+            SemanticPaperRetrieval(self.user, self.folder_id).ensure_embeddings(
+                document.paper_id,
+                max_chunks=int(os.getenv("SCIBRAIN_AUTO_EMBED_MAX_CHUNKS", "160")),
+            )
+        except Exception:
+            # Semantic retrieval is an enhancement; lexical retrieval remains authoritative fallback.
+            pass
         return self.get(document.paper_id) or saved
 
     def load_document(self, paper_id: str) -> FullTextDocument | None:
@@ -153,7 +164,7 @@ class PaperMemoryStore:
         row = self.get(paper_id)
         if not row:
             return {"cached": False, "paper_id": paper_id}
-        return {
+        status = {
             "cached": True,
             "paper_id": paper_id,
             "page_count": row.get("page_count"),
@@ -166,3 +177,9 @@ class PaperMemoryStore:
             "indexed_at": row.get("indexed_at"),
             "updated_at": row.get("updated_at"),
         }
+        try:
+            from .semantic_retrieval import SemanticPaperRetrieval
+            status["semantic_index"] = SemanticPaperRetrieval(self.user, self.folder_id).embedding_status(paper_id)
+        except Exception:
+            status["semantic_index"] = {"configured": False, "complete": False}
+        return status

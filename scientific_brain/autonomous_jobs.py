@@ -7,6 +7,8 @@ from . import jobs as _jobs
 from .agents import MathematicalAgent, StatisticalAgent
 from .jobs import ScientificJobProcessor, _specialist_agents as _base_specialist_agents
 from .models import PaperKind
+from .ocr_service import ScannedPaperOCR
+from .visual_sweep import AutomaticVisualSweep, vision_configured
 from .workspaces import UserWorkspaceStore
 
 
@@ -16,12 +18,6 @@ def _research_provider(provider: object) -> object:
 
 
 def _v012_specialist_agents(provider: object, kind: PaperKind) -> list[object]:
-    """Extend the stable v0.11 reviewer registry without rewriting the job engine.
-
-    Mathematics is audited for theory/simulation/hybrid work and also for experimental work
-    because dimensional consistency and derived quantities frequently matter there. Statistical
-    review is added only where empirical variability is normally meaningful.
-    """
     base = list(_base_specialist_agents(provider, kind))
     routed = _research_provider(provider)
     extras: list[object] = []
@@ -31,20 +27,14 @@ def _v012_specialist_agents(provider: object, kind: PaperKind) -> list[object]:
         extras.append(StatisticalAgent(routed))
     if not extras:
         return base
-    # Keep adversarial and reproducibility reviewers last so they can remain the final independent
-    # challenge layers while preserving the phase/checkpoint behavior of the existing job engine.
     split = max(0, len(base) - 2)
     return base[:split] + extras + base[split:]
 
 
-# ScientificJobProcessor resolves this registry from scientific_brain.jobs at runtime.
-# The assignment is intentionally isolated here so legacy/local workflows that import jobs.py
-# directly retain their original behavior, while the production autonomous processor gets v0.12.
 _jobs._specialist_agents = _v012_specialist_agents
 
 
 _PERMANENT_MARKERS = (
-    "pdf contains no extractable text",
     "no open-access pdf could be resolved",
     "paper not found",
     "folder_not_found",
@@ -52,6 +42,7 @@ _PERMANENT_MARKERS = (
     "requires payload.paper_id",
     "unknown review phase",
     "job is not attached",
+    "multimodal ocr provider not configured",
 )
 
 
@@ -61,13 +52,21 @@ def _retryable(exc: Exception) -> bool:
 
 
 class AutonomousScientificJobProcessor(ScientificJobProcessor):
-    """ScientificJobProcessor with bounded phase retry recovery and stale-evidence signaling."""
+    """Resumable production processor with OCR, visual review and bounded recovery.
+
+    Text extraction remains the first path. Image-only PDFs transparently switch the same review
+    job into a page-batched OCR phase; after OCR the normal scientific review resumes. Once the
+    textual/specialist review passes, a bounded set of high-value visual pages is analyzed before the
+    job is marked completed. Optional OCR/visual layers never duplicate the text review.
+    """
 
     max_phase_retries = 3
 
+    def _context(self) -> tuple[Any | None, str | None]:
+        return getattr(self.snapshot_store, "user", None), getattr(self.snapshot_store, "folder_id", None)
+
     def _mark_research_stale(self, paper_id: str) -> None:
-        user = getattr(self.snapshot_store, "user", None)
-        folder_id = getattr(self.snapshot_store, "folder_id", None)
+        user, folder_id = self._context()
         if user is None or not folder_id:
             return
         try:
@@ -82,27 +81,177 @@ class AutonomousScientificJobProcessor(ScientificJobProcessor):
             )
             if not rows:
                 return
-            document = rows[0]
             workspace._patch(
                 "scibrain_research_documents",
-                {"document_id": f"eq.{document['document_id']}"},
+                {"document_id": f"eq.{rows[0]['document_id']}"},
                 {
                     "status": "stale_evidence",
                     "stale_reason": f"paper_full_text_reviewed:{paper_id}",
                 },
             )
         except Exception:
-            # Paper review must never fail because a collaborative draft could not be marked stale.
             return
 
-    def _review_paper(self, job: dict[str, Any]) -> dict[str, Any]:
-        result = super()._review_paper(job)
-        if str(result.get("phase") or "") == "completed":
-            paper_id = str(
-                result.get("paper_id") or (job.get("payload") or {}).get("paper_id") or ""
+    def _advance_ocr(self, job: dict[str, Any], current: dict[str, Any]) -> dict[str, Any]:
+        user, folder_id = self._context()
+        if user is None or not folder_id:
+            raise RuntimeError("OCR requires authenticated folder-scoped persistence")
+        paper_id = str(current.get("paper_id") or (job.get("payload") or {}).get("paper_id") or "")
+        if not paper_id:
+            raise ValueError("review_paper job requires payload.paper_id")
+        if not vision_configured():
+            raise ValueError("multimodal OCR provider not configured for scanned PDF")
+        service = ScannedPaperOCR(user, str(folder_id))
+        total = int(current.get("ocr_page_count") or 0)
+        if total <= 0:
+            total = service.page_count(paper_id)
+        next_page = int(current.get("ocr_next_page") or 1)
+        if next_page <= total:
+            batch = service.process_batch(
+                paper_id,
+                next_page,
+                batch_size=int((job.get("payload") or {}).get("ocr_batch_size") or 2),
+                language=str((job.get("payload") or {}).get("language") or "es"),
             )
+            current.update(
+                {
+                    "paper_id": paper_id,
+                    "phase": "wait_ocr",
+                    "ocr_page_count": total,
+                    "ocr_next_page": int(batch.get("next_page") or (total + 1)),
+                    "ocr_completed_pages": service.completed_pages(paper_id),
+                    "steps_completed": int(current.get("steps_completed") or 0) + 1,
+                    "__job_status": "pending",
+                }
+            )
+            return current
+
+        finalized = service.finalize(paper_id)
+        # Start the original review again from prepare. It now resolves the persistent OCR memory.
+        reset_job = dict(job)
+        reset_job["progress"] = {}
+        resumed = super()._review_paper(reset_job)
+        resumed["ocr"] = {
+            "used": True,
+            "page_count": finalized.get("page_count"),
+            "word_count": finalized.get("word_count"),
+        }
+        resumed["steps_completed"] = int(resumed.get("steps_completed") or 0) + int(current.get("steps_completed") or 0) + 1
+        return resumed
+
+    def _advance_visual_sweep(self, job: dict[str, Any], current: dict[str, Any]) -> dict[str, Any]:
+        user, folder_id = self._context()
+        paper_id = str(current.get("paper_id") or (job.get("payload") or {}).get("paper_id") or "")
+        review_result = dict(current.get("review_result") or {})
+        pages = [int(x) for x in (current.get("visual_pages") or []) if int(x) > 0]
+        index = int(current.get("visual_index") or 0)
+        if user is None or not folder_id or not paper_id or not pages or index >= len(pages):
+            final = review_result or {"paper_id": paper_id, "phase": "completed"}
+            final["phase"] = "completed"
+            final["visual_sweep"] = {
+                "planned_pages": pages,
+                "analyzed_pages": current.get("visual_analyzed_pages") or [],
+            }
             if paper_id:
                 self._mark_research_stale(paper_id)
+            return final
+
+        sweep = AutomaticVisualSweep(user, str(folder_id))
+        try:
+            result = sweep.analyze_batch(
+                paper_id,
+                pages,
+                index,
+                batch_size=int((job.get("payload") or {}).get("visual_batch_size") or 1),
+                language=str((job.get("payload") or {}).get("language") or "es"),
+            )
+        except Exception as exc:
+            # Automatic visual enrichment is valuable but must not invalidate a completed textual
+            # scientific review. Keep a bounded diagnostic and finish the paper review.
+            final = review_result or {"paper_id": paper_id, "phase": "completed"}
+            final["phase"] = "completed"
+            final["visual_sweep"] = {
+                "planned_pages": pages,
+                "analyzed_pages": current.get("visual_analyzed_pages") or [],
+                "warning": f"{type(exc).__name__}: {exc}",
+            }
+            self._mark_research_stale(paper_id)
+            return final
+
+        analyzed = list(current.get("visual_analyzed_pages") or [])
+        analyzed.extend(result.get("processed") or [])
+        analyzed.extend(result.get("cached") or [])
+        next_index = int(result.get("next_index") or len(pages))
+        if next_index >= len(pages):
+            final = review_result or {"paper_id": paper_id, "phase": "completed"}
+            final["phase"] = "completed"
+            final["visual_sweep"] = {
+                "planned_pages": pages,
+                "analyzed_pages": sorted(set(int(x) for x in analyzed)),
+            }
+            self._mark_research_stale(paper_id)
+            return final
+        current.update(
+            {
+                "phase": "visual_sweep",
+                "visual_index": next_index,
+                "visual_analyzed_pages": sorted(set(int(x) for x in analyzed)),
+                "steps_completed": int(current.get("steps_completed") or 0) + 1,
+                "__job_status": "pending",
+            }
+        )
+        return current
+
+    def _review_paper(self, job: dict[str, Any]) -> dict[str, Any]:
+        current = dict(job.get("progress") or {})
+        phase = str(current.get("phase") or "prepare")
+        if phase == "wait_ocr":
+            return self._advance_ocr(job, current)
+        if phase == "visual_sweep":
+            return self._advance_visual_sweep(job, current)
+
+        try:
+            result = super()._review_paper(job)
+        except ValueError as exc:
+            if "pdf contains no extractable text" not in str(exc).lower():
+                raise
+            if not vision_configured():
+                raise ValueError("multimodal OCR provider not configured for scanned PDF") from exc
+            paper_id = str((job.get("payload") or {}).get("paper_id") or "")
+            return {
+                "__job_status": "pending",
+                "paper_id": paper_id,
+                "phase": "wait_ocr",
+                "ocr_next_page": 1,
+                "ocr_page_count": 0,
+                "ocr_completed_pages": [],
+                "steps_completed": int(current.get("steps_completed") or 0),
+                "reason": "image_only_pdf_requires_ocr",
+            }
+
+        if str(result.get("phase") or "") != "completed":
+            return result
+
+        paper_id = str(result.get("paper_id") or (job.get("payload") or {}).get("paper_id") or "")
+        user, folder_id = self._context()
+        if user is not None and folder_id and paper_id and vision_configured():
+            try:
+                pages = AutomaticVisualSweep(user, str(folder_id)).plan(paper_id)
+            except Exception:
+                pages = []
+            if pages:
+                return {
+                    "__job_status": "pending",
+                    "paper_id": paper_id,
+                    "phase": "visual_sweep",
+                    "visual_pages": pages,
+                    "visual_index": 0,
+                    "visual_analyzed_pages": [],
+                    "review_result": result,
+                    "steps_completed": int(result.get("steps_completed") or 0),
+                }
+        if paper_id:
+            self._mark_research_stale(paper_id)
         return result
 
     def run(self, job_id: str) -> dict[str, Any]:
