@@ -30,7 +30,7 @@ _STANDARD_HEADINGS = {
 }
 _FIGURE_RE = re.compile(r"^\s*(fig(?:ure)?|figura)\s*\.?\s*([0-9]+[a-z]?)\s*[:.\-]?\s*(.{4,700})$", re.I)
 _TABLE_RE = re.compile(r"^\s*(table|tabla)\s*\.?\s*([0-9]+[a-z]?)\s*[:.\-]?\s*(.{4,700})$", re.I)
-_SECTION_NUMBER_RE = re.compile(r"^\s*(?:[IVXLC]+\.?|\d+(?:\.\d+){0,4})\s+\S+")
+_SECTION_NUMBER_RE = re.compile(r"^\s*(?:[IVXLC]+\.?|\d+(?:\.\d+){0,4}\.?)\s+\S+")
 _TOKEN_RE = re.compile(r"[A-Za-zÀ-ÿ0-9_\-]{3,}")
 _STOPWORDS = {
     "the", "and", "for", "with", "from", "that", "this", "into", "are", "was", "were", "using", "used",
