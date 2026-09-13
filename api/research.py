@@ -44,9 +44,12 @@ class handler(BaseHTTPRequestHandler):
         try:
             query = self._query()
             session_id = (query.get("session_id") or [None])[0]
+            folder_id = (query.get("folder_id") or [None])[0]
             limit = int((query.get("limit") or ["100"])[0])
-            store = UserSnapshotStore(user)
-            self._write(200, {"jobs": store.list_jobs(session_id=session_id, limit=limit)})
+            store = UserSnapshotStore(user, folder_id=folder_id)
+            self._write(200, {
+                "jobs": store.list_jobs(session_id=session_id, folder_id=folder_id, limit=limit)
+            })
         except Exception as exc:
             self._write(500, {"error": type(exc).__name__, "detail": str(exc)})
 
@@ -88,23 +91,42 @@ class handler(BaseHTTPRequestHandler):
                 result["folder_name"] = folder.get("name")
                 self._write(200, result)
                 return
+
             if op == "jobs":
                 session_id = body.get("session_id")
+                folder_id = str(body.get("folder_id") or "").strip() or None
                 job_type = body.get("job_type")
-                if not session_id or not job_type:
-                    raise ValueError("session_id and job_type are required")
+                if not job_type:
+                    raise ValueError("job_type is required")
                 if job_type not in SUPPORTED_JOB_TYPES:
                     self._write(400, {"error": "unsupported_job_type", "supported": sorted(SUPPORTED_JOB_TYPES)})
                     return
-                base_store = UserSnapshotStore(user)
-                state = base_store.load_state(session_id)
-                if state is None:
-                    self._write(404, {"error": "session_not_found"})
+
+                effective_folder = folder_id
+                if session_id:
+                    base_store = UserSnapshotStore(user)
+                    state = base_store.load_state(session_id)
+                    if state is None:
+                        self._write(404, {"error": "session_not_found"})
+                        return
+                    effective_folder = effective_folder or state.folder_id
+                if not effective_folder:
+                    raise ValueError("folder_id or session_id is required")
+
+                workspace = UserWorkspaceStore(user)
+                if not workspace.get_folder(str(effective_folder)):
+                    self._write(404, {"error": "folder_not_found"})
                     return
-                store = UserSnapshotStore(user, folder_id=state.folder_id)
-                job = store.create_job(session_id, job_type, body.get("payload") or {})
+                store = UserSnapshotStore(user, folder_id=str(effective_folder))
+                job = store.create_job(
+                    session_id,
+                    job_type,
+                    body.get("payload") or {},
+                    folder_id=str(effective_folder),
+                )
                 self._write(201, job)
                 return
+
             if op == "run_job":
                 job_id = body.get("job_id")
                 if not job_id:
@@ -114,16 +136,24 @@ class handler(BaseHTTPRequestHandler):
                 if job is None:
                     self._write(404, {"error": "job_not_found"})
                     return
-                state = base_store.load_state(job["session_id"])
-                if state is None:
-                    self._write(404, {"error": "session_not_found"})
-                    return
-                store = UserSnapshotStore(user, folder_id=state.folder_id)
+
+                folder_id = job.get("folder_id")
+                if not folder_id and job.get("session_id"):
+                    state = base_store.load_state(job["session_id"])
+                    if state is None:
+                        self._write(404, {"error": "session_not_found"})
+                        return
+                    folder_id = state.folder_id
+                if not folder_id:
+                    raise ValueError("job is not attached to a folder or session")
+
+                store = UserSnapshotStore(user, folder_id=str(folder_id))
                 provider = provider_from_env("cloud", task="research")
                 with temporary_memory() as memory:
                     result = ScientificJobProcessor(memory, provider, store).run(job_id)
                 self._write(200, result)
                 return
+
             self._write(404, {"error": "unknown_research_operation", "op": op})
         except (ValueError, KeyError, json.JSONDecodeError) as exc:
             self._write(400, {"error": type(exc).__name__, "detail": str(exc)})
