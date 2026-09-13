@@ -5,15 +5,21 @@ from typing import Any
 
 from .artifacts import ArtifactRecord, LocalArtifactStore
 from .cloud_papers import CloudPaperService
+from .graph_service import ScientificGraphService
+from .graph_store import ScientificGraphStore
 from .memory import ScientificMemory
 from .models import AuditEvent
 from .persistence import SnapshotStore, hydrate_memory_from_snapshot
+from .workspaces import UserWorkspaceStore
 
 
 SUPPORTED_JOB_TYPES = {
     "discover_literature",
     "review_paper",
     "enqueue_selected_reviews",
+    "build_scientific_graph",
+    "detect_contradictions",
+    "generate_competing_hypotheses",
 }
 
 
@@ -38,8 +44,14 @@ class ScientificJobProcessor:
                 progress = self._discover(job)
             elif job["job_type"] == "review_paper":
                 progress = self._review_paper(job)
-            else:
+            elif job["job_type"] == "enqueue_selected_reviews":
                 progress = self._enqueue_selected_reviews(job)
+            elif job["job_type"] == "build_scientific_graph":
+                progress = self._build_graph(job)
+            elif job["job_type"] == "detect_contradictions":
+                progress = self._detect_contradictions(job)
+            else:
+                progress = self._generate_hypotheses(job)
             self.snapshot_store.update_job(job_id, status="completed", progress=progress)
         except Exception as exc:
             self.snapshot_store.update_job(
@@ -139,4 +151,70 @@ class ScientificJobProcessor:
             "enqueued": len(children),
             "job_ids": [child["job_id"] for child in children],
             "paper_ids": paper_ids,
+        }
+
+    def _graph_service(self, job: dict[str, Any]) -> tuple[Any, ScientificGraphService]:
+        state = self._state(job["session_id"])
+        user = getattr(self.snapshot_store, "user", None)
+        folder_id = getattr(self.snapshot_store, "folder_id", None) or state.folder_id
+        if user is None or not folder_id:
+            raise RuntimeError("Scientific graph jobs require an authenticated user and folder-scoped snapshot store")
+        graph_store = ScientificGraphStore(user, folder_id=folder_id)
+        workspace = UserWorkspaceStore(user)
+        service = ScientificGraphService(
+            snapshot_store=self.snapshot_store,
+            workspace_store=workspace,
+            graph_store=graph_store,
+            provider=self.provider,
+        )
+        return state, service
+
+    def _build_graph(self, job: dict[str, Any]) -> dict[str, Any]:
+        state, service = self._graph_service(job)
+        payload = job.get("payload") or {}
+        result = service.build(full_text_only=bool(payload.get("full_text_only", True)))
+        state.audit_log.append(AuditEvent(
+            event="scientific_graph_built",
+            detail=f"nodes={len(result.nodes)}; edges={len(result.edges)}; papers={result.paper_count}",
+        ))
+        self.memory.save_state(state)
+        self.snapshot_store.save_state(state, project_id=state.project_id)
+        return {
+            "papers": result.paper_count,
+            "claims": result.claim_count,
+            "evidence": result.evidence_count,
+            "nodes": len(result.nodes),
+            "edges": len(result.edges),
+        }
+
+    def _detect_contradictions(self, job: dict[str, Any]) -> dict[str, Any]:
+        state, service = self._graph_service(job)
+        payload = job.get("payload") or {}
+        rows = service.detect_contradictions(context=str(payload.get("context") or ""))
+        state.audit_log.append(AuditEvent(
+            event="contradictions_analyzed",
+            detail=f"candidates={len(rows)}",
+        ))
+        self.memory.save_state(state)
+        self.snapshot_store.save_state(state, project_id=state.project_id)
+        return {
+            "contradictions": len(rows),
+            "candidate_ids": [row.contradiction_id for row in rows],
+        }
+
+    def _generate_hypotheses(self, job: dict[str, Any]) -> dict[str, Any]:
+        state, service = self._graph_service(job)
+        payload = job.get("payload") or {}
+        question = str(payload.get("question") or state.question)
+        competition = service.generate_hypotheses(question)
+        state.audit_log.append(AuditEvent(
+            event="competing_hypotheses_generated",
+            detail=f"competition={competition.competition_id}; hypotheses={len(competition.hypotheses)}",
+        ))
+        self.memory.save_state(state)
+        self.snapshot_store.save_state(state, project_id=state.project_id)
+        return {
+            "competition_id": competition.competition_id,
+            "hypotheses": len(competition.hypotheses),
+            "decision_needed": competition.decision_needed,
         }
