@@ -31,9 +31,51 @@
     return !!modal && !modal.classList.contains('hidden');
   }
 
-  async function restorePersistentContext() {
-    if (!isAuthenticated() || typeof api !== 'function' || typeof selectedFolder !== 'function') return null;
-    const folder = selectedFolder();
+  async function readSupabaseRows(path) {
+    if (typeof supabaseAuthFetch !== 'function') return [];
+    let response = await supabaseAuthFetch(path, {method:'GET'});
+    if (response.status === 401 && typeof refreshAuth === 'function' && await refreshAuth()) {
+      response = await supabaseAuthFetch(path, {method:'GET'});
+    }
+    if (!response.ok) throw new Error(`Supabase recovery HTTP ${response.status}`);
+    const rows = await response.json();
+    return Array.isArray(rows) ? rows : [];
+  }
+
+  async function latestContextRows(folderId=null) {
+    const owner = typeof state !== 'undefined' ? state.authUser?.id : null;
+    const ownerFilter = owner ? `&owner_id=eq.${encodeURIComponent(owner)}` : '';
+    const folderFilter = folderId ? `&folder_id=eq.${encodeURIComponent(folderId)}` : '';
+    const [sessions, projects, documents] = await Promise.all([
+      readSupabaseRows(`/rest/v1/scibrain_states?select=session_id,folder_id,updated_at${ownerFilter}${folderFilter}&order=updated_at.desc&limit=1`),
+      readSupabaseRows(`/rest/v1/scibrain_projects?select=project_id,folder_id,definition,updated_at${ownerFilter}${folderFilter}&order=updated_at.desc&limit=1`),
+      readSupabaseRows(`/rest/v1/scibrain_research_documents?select=document_id,folder_id,topic,status,revision,updated_at${ownerFilter}${folderFilter}&order=updated_at.desc&limit=1`),
+    ]);
+    return {session:sessions[0] || null, project:projects[0] || null, document:documents[0] || null};
+  }
+
+  function newestFolderFromContext(context) {
+    const candidates = [context?.session, context?.project, context?.document]
+      .filter(row => row?.folder_id)
+      .map(row => ({folder_id:row.folder_id, timestamp:Date.parse(row.updated_at || 0) || 0}));
+    candidates.sort((a,b) => b.timestamp - a.timestamp);
+    return candidates[0]?.folder_id || null;
+  }
+
+  async function activateFolderForRecovery(folderId) {
+    if (!folderId || typeof state === 'undefined' || !Array.isArray(state.folders)) return false;
+    if (!state.folders.some(folder => folder.folder_id === folderId)) return false;
+    if (state.selectedFolderId === folderId) return true;
+    state.selectedFolderId = folderId;
+    localStorage.setItem('scibrain_selected_folder', folderId);
+    if (typeof renderFolders === 'function') renderFolders();
+    if (typeof loadLibrary === 'function') await loadLibrary();
+    return true;
+  }
+
+  async function restorePersistentContext({allowFolderSwitch=false}={}) {
+    if (!isAuthenticated() || typeof selectedFolder !== 'function') return null;
+    let folder = selectedFolder();
     if (!folder?.folder_id) return null;
     try {
       if (typeof state !== 'undefined' && state.session?.folder_id === folder.folder_id) {
@@ -43,32 +85,46 @@
     if (restoringFolderId === folder.folder_id) return null;
     restoringFolderId = folder.folder_id;
     try {
-      const result = await api('/api/resume', {
-        method:'POST',
-        body:JSON.stringify({folder_id:folder.folder_id, reconstruct:true}),
-      });
-      const recovered = result?.session;
-      if (recovered?.state && typeof state !== 'undefined') {
-        state.session = recovered.state;
-        state.artifacts = recovered.artifacts || [];
-        const sessionId = recovered.state.session_id || recovered.session_id;
-        if (sessionId) {
-          localStorage.setItem('scibrain_session', sessionId);
-          const input = document.querySelector('#session-input');
-          if (input) input.value = sessionId;
-        }
-        if (typeof renderSession === 'function') renderSession();
-        if (typeof toast === 'function') {
-          toast(result.reconstructed
-            ? 'Sesión reconstruida desde el proyecto persistente de Supabase.'
-            : 'Sesión recuperada desde Supabase.');
+      if (allowFolderSwitch && !localStorage.getItem('scibrain_selected_folder')) {
+        const globalContext = await latestContextRows(null);
+        const recoveryFolderId = newestFolderFromContext(globalContext);
+        if (recoveryFolderId && recoveryFolderId !== folder.folder_id) {
+          await activateFolderForRecovery(recoveryFolderId);
+          folder = selectedFolder();
         }
       }
-      if (result?.research_document) {
-        window.__SCIBRAIN_RECOVERED_DOCUMENT__ = result.research_document;
+
+      if (!folder?.folder_id) return null;
+      const context = await latestContextRows(folder.folder_id);
+      window.__SCIBRAIN_RESUME_CONTEXT__ = context;
+      if (context.document) window.__SCIBRAIN_RECOVERED_DOCUMENT__ = context.document;
+
+      if (context.session?.session_id && typeof loadSession === 'function') {
+        await loadSession(context.session.session_id);
+        if (typeof toast === 'function') toast('Sesión recuperada desde Supabase.');
+        return {...context, restored:true, reconstructed:false};
       }
-      window.__SCIBRAIN_RESUME_CONTEXT__ = result || null;
-      return result;
+
+      if (context.project?.definition && typeof api === 'function') {
+        const paperIds = Array.isArray(state.library)
+          ? state.library.map(paper => paper.canonical_id).filter(Boolean)
+          : [];
+        const created = await api('/api/projects', {
+          method:'POST',
+          body:JSON.stringify({
+            project:context.project.definition,
+            folder_id:folder.folder_id,
+            paper_ids:paperIds,
+          }),
+        });
+        if (created?.session_id && typeof loadSession === 'function') {
+          await loadSession(created.session_id);
+          if (typeof toast === 'function') toast('Sesión reconstruida desde el proyecto persistente de Supabase.');
+          return {...context, restored:true, reconstructed:true, session_id:created.session_id};
+        }
+      }
+
+      return {...context, restored:!!context.document, reconstructed:false};
     } catch (error) {
       console.warn('ScientificBrain persistent context recovery failed', error);
       return null;
@@ -77,9 +133,9 @@
     }
   }
 
-  function restoreWithDeadline(timeoutMs=7000) {
+  function restoreWithDeadline(options={}, timeoutMs=7000) {
     return Promise.race([
-      restorePersistentContext(),
+      restorePersistentContext(options),
       new Promise(resolve => setTimeout(() => resolve(null), timeoutMs)),
     ]);
   }
@@ -150,7 +206,7 @@
     const baseSelectFolder = selectFolder;
     selectFolder = async function(...args) {
       const result = await baseSelectFolder.apply(this, args);
-      await restoreWithDeadline();
+      await restoreWithDeadline({allowFolderSwitch:false});
       return result;
     };
   }
@@ -161,8 +217,9 @@
     window.__SB_ADVANCED_AUTH_HOOK__ = true;
     const baseAfterAuthentication = afterAuthentication;
     afterAuthentication = async function(...args) {
+      const hadSavedFolder = !!localStorage.getItem('scibrain_selected_folder');
       const result = await baseAfterAuthentication.apply(this, args);
-      await restoreWithDeadline();
+      await restoreWithDeadline({allowFolderSwitch:!hadSavedFolder});
       requestEnhancements();
       return result;
     };
@@ -173,7 +230,7 @@
     if (!modal || !NativeMutationObserver) return;
     const observer = new NativeMutationObserver(() => {
       if (modal.classList.contains('hidden')) {
-        restoreWithDeadline().finally(requestEnhancements);
+        restoreWithDeadline({allowFolderSwitch:false}).finally(requestEnhancements);
       }
     });
     observer.observe(modal, {attributes:true, attributeFilter:['class']});
@@ -182,7 +239,7 @@
   function boot() {
     installConsentWatcher();
     if (isAuthenticated() && !consentIsBlocking()) {
-      restoreWithDeadline().finally(requestEnhancements);
+      restoreWithDeadline({allowFolderSwitch:false}).finally(requestEnhancements);
     }
   }
 
