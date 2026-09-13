@@ -43,9 +43,10 @@
         if(j.status==='completed')return j;
         if(j.status==='failed')throw new Error(j.last_error||tr('El trabajo falló','Job failed'));
         if(j.status==='pending'&&j.progress?.reason==='soft_timeout'){
-          throw new Error(tr('El análisis alcanzó el límite seguro de esta ejecución. El progreso quedó guardado; vuelve a ejecutarlo para continuar.','The analysis reached this run’s safe deadline. Progress was saved; run it again to continue.'));
+          await sleep(700);
+          continue;
         }
-        await sleep(120);
+        await sleep(180);
       }
       throw new Error(tr('Límite de pasos alcanzado; el progreso quedó guardado.','Step limit reached; progress was saved.'));
     } finally {if(button){button.disabled=false;button.textContent=button.dataset.sbText||tr('Ejecutar','Run');}}

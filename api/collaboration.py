@@ -72,7 +72,14 @@ class handler(BaseHTTPRequestHandler):
                 self._write(200, service.generate_draft(
                     str(payload.get("topic") or ""),
                     language=str(payload.get("language") or "es"),
+                    preserve_user_edits=bool(payload.get("preserve_user_edits", True)),
                 ))
+                return
+            if op == "save_brief":
+                self._write(200, service.save_brief(payload.get("brief") or {}))
+                return
+            if op == "assess_brief":
+                self._write(200, service.assess_brief(language=str(payload.get("language") or "es")))
                 return
             if op == "save_section":
                 self._write(200, service.save_section(
@@ -95,6 +102,12 @@ class handler(BaseHTTPRequestHandler):
                 self._write(200, service.review_section(
                     str(payload.get("section_key") or ""),
                     agent_id=str(payload.get("agent_id") or "critical_reviewer"),
+                    language=str(payload.get("language") or "es"),
+                ))
+                return
+            if op == "rewrite_section":
+                self._write(200, service.rewrite_section(
+                    str(payload.get("section_key") or ""),
                     language=str(payload.get("language") or "es"),
                 ))
                 return

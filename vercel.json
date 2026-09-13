@@ -7,6 +7,8 @@
     "api/workspace.py": { "maxDuration": 60 },
     "api/jobs.py": { "maxDuration": 30 },
     "api/search.py": { "maxDuration": 180 },
+    "api/run_job.py": { "maxDuration": 300 },
+    "api/paper.py": { "maxDuration": 300 },
     "api/research.py": { "maxDuration": 300 },
     "api/science.py": { "maxDuration": 300 },
     "api/orchestrate.py": { "maxDuration": 300 },
@@ -27,7 +29,6 @@
     { "source": "/api/projects", "destination": "/api/workspace?op=projects" },
     { "source": "/api/session", "destination": "/api/workspace?op=session" },
     { "source": "/api/research_search", "destination": "/api/search" },
-    { "source": "/api/run_job", "destination": "/api/research?op=run_job" },
     { "source": "/api/run_agent", "destination": "/api/science?op=run_agent" },
     { "source": "/api/validate_stage", "destination": "/api/science?op=validate_stage" },
     { "source": "/api/artifact", "destination": "/api/science?op=artifact" }
