@@ -8,8 +8,8 @@ from urllib.parse import parse_qs, urlparse
 from scientific_brain.advanced_roles import register_advanced_roles
 from scientific_brain.auth import require_user
 from scientific_brain.collaboration import AGENT_ROLES
-from scientific_brain.evidence_bound_collaboration import EvidenceBoundCollaborativeResearchService
 from scientific_brain.providers import provider_from_env
+from scientific_brain.quality_control import ScientificQualityControlService
 from scientific_brain.research_versions import ResearchVersionStore
 
 
@@ -44,7 +44,7 @@ class handler(BaseHTTPRequestHandler):
     def _service(self, user, folder_id: str):
         if not folder_id:
             raise ValueError("folder_id is required")
-        return EvidenceBoundCollaborativeResearchService(
+        return ScientificQualityControlService(
             user=user,
             folder_id=folder_id,
             provider=provider_from_env("cloud", task="research"),
@@ -96,7 +96,11 @@ class handler(BaseHTTPRequestHandler):
             versions = ResearchVersionStore(user, folder_id)
             op = self._op()
 
-            if op in {"generate_draft", "save_brief", "assess_brief", "save_section", "save_topic", "rewrite_section", "verify_document"}:
+            mutation_ops = {
+                "generate_draft", "save_brief", "assess_brief", "save_section", "save_topic",
+                "rewrite_section", "verify_document", "benchmark_document", "repair_failed_sections",
+            }
+            if op in mutation_ops:
                 versions.snapshot(versions.document(), reason=f"before_{op}")
 
             if op == "generate_draft":
@@ -156,6 +160,21 @@ class handler(BaseHTTPRequestHandler):
                 result = service.verify_document(
                     language=str(payload.get("language") or "es"),
                     use_model=bool(payload.get("use_model", True)),
+                )
+                self._write(200, self._snapshot_result(versions, result, op))
+                return
+            if op == "benchmark_document":
+                result = service.benchmark_document(
+                    language=str(payload.get("language") or "es"),
+                    use_model=bool(payload.get("use_model", True)),
+                    persist=True,
+                )
+                self._write(200, self._snapshot_result(versions, result, op))
+                return
+            if op == "repair_failed_sections":
+                result = service.repair_failed_sections(
+                    language=str(payload.get("language") or "es"),
+                    max_sections=int(payload.get("max_sections") or 4),
                 )
                 self._write(200, self._snapshot_result(versions, result, op))
                 return
