@@ -35,6 +35,7 @@ _jobs._specialist_agents = _v012_specialist_agents
 
 
 _PERMANENT_MARKERS = (
+    "pdf contains no extractable text",
     "no open-access pdf could be resolved",
     "paper not found",
     "folder_not_found",
@@ -127,7 +128,6 @@ class AutonomousScientificJobProcessor(ScientificJobProcessor):
             return current
 
         finalized = service.finalize(paper_id)
-        # Start the original review again from prepare. It now resolves the persistent OCR memory.
         reset_job = dict(job)
         reset_job["progress"] = {}
         resumed = super()._review_paper(reset_job)
@@ -166,8 +166,6 @@ class AutonomousScientificJobProcessor(ScientificJobProcessor):
                 language=str((job.get("payload") or {}).get("language") or "es"),
             )
         except Exception as exc:
-            # Automatic visual enrichment is valuable but must not invalidate a completed textual
-            # scientific review. Keep a bounded diagnostic and finish the paper review.
             final = review_result or {"paper_id": paper_id, "phase": "completed"}
             final["phase"] = "completed"
             final["visual_sweep"] = {
