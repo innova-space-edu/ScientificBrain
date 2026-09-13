@@ -66,7 +66,9 @@ class ScientificJobProcessor:
         return hydrate_memory_from_snapshot(self.memory, self.snapshot_store, session_id)
 
     def _discover(self, job: dict[str, Any]) -> dict[str, Any]:
-        session_id = job["session_id"]
+        session_id = job.get("session_id")
+        if not session_id:
+            raise ValueError("discover_literature requires a research session")
         state = self._state(session_id)
         payload = job.get("payload") or {}
         query = str(payload.get("query") or state.question)
@@ -106,8 +108,8 @@ class ScientificJobProcessor:
         return {"discovered": len(paper_ids), "paper_ids": paper_ids}
 
     def _review_paper(self, job: dict[str, Any]) -> dict[str, Any]:
-        session_id = job["session_id"]
-        state = self._state(session_id)
+        session_id = job.get("session_id")
+        state = self._state(session_id) if session_id else None
         payload = job.get("payload") or {}
         paper_id = payload.get("paper_id")
         if not paper_id:
@@ -118,32 +120,44 @@ class ScientificJobProcessor:
             str(paper_id),
             pdf_url=payload.get("pdf_url"),
         )
-        if paper_id not in state.selected_paper_ids:
-            state.selected_paper_ids.append(str(paper_id))
-        state.audit_log.append(AuditEvent(
-            event="paper_full_text_reviewed",
-            detail=f"paper={paper_id}; pages={document.page_count}",
-        ))
-        self.memory.save_state(state)
-        self.snapshot_store.save_state(state, project_id=state.project_id)
+        if state is not None:
+            if paper_id not in state.selected_paper_ids:
+                state.selected_paper_ids.append(str(paper_id))
+            state.audit_log.append(AuditEvent(
+                event="paper_full_text_reviewed",
+                detail=f"paper={paper_id}; pages={document.page_count}",
+            ))
+            self.memory.save_state(state)
+            self.snapshot_store.save_state(state, project_id=state.project_id)
         return {
             "paper_id": paper_id,
             "pages": document.page_count,
             "source_url": document.source_url,
+            "session_id": session_id,
+            "folder_scoped": session_id is None,
             "gates": [gate.model_dump(mode="json") for gate in result.gate_results],
         }
 
     def _enqueue_selected_reviews(self, job: dict[str, Any]) -> dict[str, Any]:
-        state = self._state(job["session_id"])
+        session_id = job.get("session_id")
         payload = job.get("payload") or {}
-        requested = payload.get("paper_ids") or state.selected_paper_ids or state.candidate_paper_ids
+        if session_id:
+            state = self._state(session_id)
+            requested = payload.get("paper_ids") or state.selected_paper_ids or state.candidate_paper_ids
+            effective_session = state.session_id
+        else:
+            requested = payload.get("paper_ids") or []
+            effective_session = None
+            if not requested:
+                raise ValueError("folder-scoped enqueue_selected_reviews requires payload.paper_ids")
         limit = min(max(int(payload.get("limit", 100)), 1), 100)
         paper_ids = list(dict.fromkeys(str(x) for x in requested))[:limit]
         children = [
             self.snapshot_store.create_job(
-                state.session_id,
+                effective_session,
                 "review_paper",
                 {"paper_id": paper_id},
+                folder_id=getattr(self.snapshot_store, "folder_id", None),
             )
             for paper_id in paper_ids
         ]
@@ -154,7 +168,10 @@ class ScientificJobProcessor:
         }
 
     def _graph_service(self, job: dict[str, Any]) -> tuple[Any, ScientificGraphService]:
-        state = self._state(job["session_id"])
+        session_id = job.get("session_id")
+        if not session_id:
+            raise ValueError(f"{job['job_type']} requires a research session")
+        state = self._state(session_id)
         user = getattr(self.snapshot_store, "user", None)
         folder_id = getattr(self.snapshot_store, "folder_id", None) or state.folder_id
         if user is None or not folder_id:
