@@ -22,4 +22,7 @@ jobs:
       - name: Python tests
         run: pytest -q
       - name: Frontend JavaScript syntax
-        run: node --check assets/app.js
+        run: |
+          node --check assets/i18n.js
+          node --check assets/app.js
+          node --check assets/app_plus.js
