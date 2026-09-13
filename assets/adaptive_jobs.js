@@ -22,11 +22,15 @@
     const jobs=(state.jobs||[]).filter(j=>j.job_type==='review_paper');
     [...document.querySelectorAll('#jobs-list .agent-row')].forEach((row,i)=>{
       const j=jobs[i]; if(!j)return;
-      const d=row.querySelector('div:first-child span');
-      if(d)d.textContent=`${j.payload?.paper_id||''}\n${phase(j)}`;
+      const d=row.querySelector('div:first-child span'), text=`${j.payload?.paper_id||''}\n${phase(j)}`;
+      if(d&&d.textContent!==text)d.textContent=text;
     });
     const s=q('#review-progress-summary'), n=(state.library||[]).length;
-    if(s){const mode=n<=5?tr('profundización por paper','deep per-paper'):n<=25?tr('corpus balanceado','balanced corpus'):n<=100?tr('por lotes','batched'):tr('síntesis jerárquica','hierarchical'); const base=s.textContent.split(' · modo ')[0].split(' · mode ')[0]; s.textContent=`${base} · ${tr('modo','mode')} ${mode}`;}
+    if(s){
+      const mode=n<=5?tr('profundización por paper','deep per-paper'):n<=25?tr('corpus balanceado','balanced corpus'):n<=100?tr('por lotes','batched'):tr('síntesis jerárquica','hierarchical');
+      const base=s.textContent.split(' · modo ')[0].split(' · mode ')[0], text=`${base} · ${tr('modo','mode')} ${mode}`;
+      if(s.textContent!==text)s.textContent=text;
+    }
   }
   async function runJob(jobId,button=null,max=500){
     if(button){button.disabled=true;button.dataset.sbText||=button.textContent;}
@@ -38,8 +42,10 @@
         compact();
         if(j.status==='completed')return j;
         if(j.status==='failed')throw new Error(j.last_error||tr('El trabajo falló','Job failed'));
-        // HTTP 202/pending is an expected resumable checkpoint, not completion.
-        await sleep(j.progress?.reason==='soft_timeout'?750:120);
+        if(j.status==='pending'&&j.progress?.reason==='soft_timeout'){
+          throw new Error(tr('El análisis alcanzó el límite seguro de esta ejecución. El progreso quedó guardado; vuelve a ejecutarlo para continuar.','The analysis reached this run’s safe deadline. Progress was saved; run it again to continue.'));
+        }
+        await sleep(120);
       }
       throw new Error(tr('Límite de pasos alcanzado; el progreso quedó guardado.','Step limit reached; progress was saved.'));
     } finally {if(button){button.disabled=false;button.textContent=button.dataset.sbText||tr('Ejecutar','Run');}}

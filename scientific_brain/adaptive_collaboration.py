@@ -1,18 +1,35 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from typing import Any
 
 from .collaboration import CollaborativeResearchService, _short
 
 
-class AdaptiveCollaborativeResearchService(CollaborativeResearchService):
-    """Corpus-aware collaborative synthesis.
+def _stable_source_id(paper: dict[str, Any]) -> str:
+    """Stable evidence tag independent of corpus order or paper deletion."""
+    identity = (paper.get("canonical_id") or paper.get("doi") or paper.get("arxiv_id")
+                or paper.get("item_id") or paper.get("title") or "unknown-source")
+    digest = hashlib.sha1(str(identity).encode("utf-8")).hexdigest()[:8].upper()
+    return f"P{digest}"
 
-    Small folders receive deep per-paper context. Large folders receive a fair,
-    bounded representation of every paper instead of silently dropping papers
-    after the first 90k characters.
-    """
+
+class AdaptiveCollaborativeResearchService(CollaborativeResearchService):
+    """Corpus-aware collaborative synthesis with stable provenance tags."""
+
+    def _messages(self, limit: int = 100) -> list[dict[str, Any]]:
+        rows = self.workspace._select(
+            "scibrain_discussion_messages",
+            {
+                "folder_id": f"eq.{self.folder_id}",
+                "select": "message_id,document_id,message_role,agent_id,section_key,content,evidence_refs,created_at",
+                "order": "created_at.desc",
+                "limit": str(max(1, min(limit, 300))),
+            },
+        )
+        rows.reverse()
+        return rows
 
     def _manifest_and_context(self) -> tuple[list[dict[str, Any]], str]:
         papers = self._paper_rows()
@@ -24,23 +41,18 @@ class AdaptiveCollaborativeResearchService(CollaborativeResearchService):
         blocks: list[str] = []
         total = len(papers)
         reviewed = sum(p.get("review_depth") == "full_text_reviewed" for p in papers)
-        header = json.dumps({
-            "corpus_summary": {
-                "total_papers": total,
-                "full_text_reviewed": reviewed,
-                "metadata_or_abstract_only": total - reviewed,
-                "context_policy": (
-                    "deep_per_source" if total <= 5 else
-                    "balanced_all_sources" if total <= 25 else
-                    "compressed_all_sources"
-                ),
-            }
-        }, ensure_ascii=False)
+        header = json.dumps({"corpus_summary": {
+            "total_papers": total,
+            "full_text_reviewed": reviewed,
+            "metadata_or_abstract_only": total - reviewed,
+            "context_policy": "deep_per_source" if total <= 5 else "balanced_all_sources" if total <= 25 else "compressed_all_sources",
+            "source_id_policy": "stable_hash_of_canonical_source_identity",
+        }}, ensure_ascii=False)
         blocks.append(header)
         remaining -= len(header)
 
         for i, paper in enumerate(papers, 1):
-            source_id = f"P{i}"
+            source_id = _stable_source_id(paper)
             record = paper.get("record") or {}
             analysis = paper.get("analysis") or {}
             critique = paper.get("critique") or {}
@@ -60,31 +72,23 @@ class AdaptiveCollaborativeResearchService(CollaborativeResearchService):
             manifest.append(item)
 
             papers_left = total - i + 1
-            fair_budget = max(160, remaining // max(1, papers_left))
-            fair_budget = min(9000, fair_budget)
+            fair_budget = min(9000, max(160, remaining // max(1, papers_left)))
             is_full = paper.get("review_depth") == "full_text_reviewed" and bool(analysis)
-
             if is_full:
                 claims = analysis.get("claims") or []
                 evidence = analysis.get("evidence") or []
                 if fair_budget < 1400:
-                    claims = claims[:1]
-                    evidence = []
+                    claims, evidence = claims[:1], []
                 elif fair_budget < 2800:
-                    claims = claims[:2]
-                    evidence = evidence[:2]
+                    claims, evidence = claims[:2], evidence[:2]
                 elif fair_budget < 5000:
-                    claims = claims[:4]
-                    evidence = evidence[:4]
+                    claims, evidence = claims[:4], evidence[:4]
                 payload = {
-                    "id": source_id,
-                    "title": paper.get("title"),
-                    "year": str(paper.get("publication_date") or "")[:4],
-                    "doi": paper.get("doi"),
+                    "id": source_id, "title": paper.get("title"),
+                    "year": str(paper.get("publication_date") or "")[:4], "doi": paper.get("doi"),
                     "review_depth": paper.get("review_depth"),
                     "summary": _short(analysis.get("summary"), max(260, fair_budget // 3)),
-                    "claims": claims,
-                    "evidence": evidence,
+                    "claims": claims, "evidence": evidence,
                     "limitations": analysis.get("limitations") or [],
                     "uncertainty": analysis.get("uncertainty") or [],
                     "physical_model": analysis.get("physical_model") or [],
@@ -92,13 +96,9 @@ class AdaptiveCollaborativeResearchService(CollaborativeResearchService):
                 }
             else:
                 payload = {
-                    "id": source_id,
-                    "title": paper.get("title"),
-                    "authors": paper.get("authors") or [],
-                    "year": str(paper.get("publication_date") or "")[:4],
-                    "journal": paper.get("journal"),
-                    "doi": paper.get("doi"),
-                    "review_depth": paper.get("review_depth"),
+                    "id": source_id, "title": paper.get("title"), "authors": paper.get("authors") or [],
+                    "year": str(paper.get("publication_date") or "")[:4], "journal": paper.get("journal"),
+                    "doi": paper.get("doi"), "review_depth": paper.get("review_depth"),
                     "abstract": _short(record.get("abstract") or "", max(120, fair_budget - 300)),
                 }
 
