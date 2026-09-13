@@ -9,6 +9,7 @@ from scientific_brain.advanced_roles import register_advanced_roles
 from scientific_brain.auth import require_user
 from scientific_brain.collaboration import AGENT_ROLES
 from scientific_brain.providers import provider_from_env
+from scientific_brain.professional_exports import ProfessionalExportService
 from scientific_brain.quality_control import ScientificQualityControlService
 from scientific_brain.research_versions import ResearchVersionStore
 
@@ -75,7 +76,7 @@ class handler(BaseHTTPRequestHandler):
                 return
             if op == "export":
                 fmt = (query.get("format") or ["markdown"])[0]
-                self._write(200, ResearchVersionStore(user, folder_id).export(fmt))
+                self._write(200, ProfessionalExportService(user, folder_id).export(fmt))
                 return
             self._write(404, {"error": "unknown_collaboration_operation", "op": op})
         except KeyError as exc:
