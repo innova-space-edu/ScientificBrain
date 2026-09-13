@@ -28,7 +28,6 @@ def _dimensions() -> int:
         value = int(os.getenv("SCIBRAIN_EMBEDDING_DIMENSIONS", str(DEFAULT_EMBEDDING_DIMENSIONS)))
     except ValueError:
         value = DEFAULT_EMBEDDING_DIMENSIONS
-    # Database schema is deliberately fixed at 768 to keep the vector index stable.
     return DEFAULT_EMBEDDING_DIMENSIONS if value != DEFAULT_EMBEDDING_DIMENSIONS else value
 
 
@@ -157,16 +156,17 @@ class SemanticPaperRetrieval:
         return str(rows[0].get("title") or "none") if rows else "none"
 
     def embedding_status(self, paper_id: str) -> dict[str, Any]:
+        # Never transfer the 768-dimensional vector merely to count indexed chunks.
         rows = self.workspace._select(
             "scibrain_paper_chunks",
             {
                 "folder_id": f"eq.{self.folder_id}",
                 "paper_id": f"eq.{paper_id}",
-                "select": "chunk_id,embedding,embedding_model",
+                "select": "chunk_id,embedded_at,embedding_model",
                 "limit": "1000",
             },
         )
-        embedded = sum(row.get("embedding") is not None for row in rows)
+        embedded = sum(row.get("embedded_at") is not None for row in rows)
         return {
             "configured": self.provider.available,
             "model": self.provider.model,
@@ -242,14 +242,12 @@ class SemanticPaperRetrieval:
     def search(self, paper_id: str, query: str, limit: int = 12) -> list[dict[str, Any]]:
         if not self.provider.available or not query.strip():
             return []
-        # Fill a bounded amount of legacy/unembedded memory on first use. This is idempotent.
         try:
             self.ensure_embeddings(
                 paper_id,
                 max_chunks=int(os.getenv("SCIBRAIN_LAZY_EMBED_MAX_CHUNKS", "160")),
             )
         except Exception:
-            # Keyword retrieval remains the safe fallback.
             pass
         started = time.perf_counter()
         try:

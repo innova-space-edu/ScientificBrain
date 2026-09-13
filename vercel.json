@@ -12,7 +12,9 @@
     "api/research.py": { "maxDuration": 300 },
     "api/science.py": { "maxDuration": 300 },
     "api/orchestrate.py": { "maxDuration": 300 },
-    "api/collaboration.py": { "maxDuration": 300 }
+    "api/collaboration.py": { "maxDuration": 300 },
+    "api/corpus.py": { "maxDuration": 300 },
+    "api/watch_cron.py": { "maxDuration": 300 }
   },
   "rewrites": [
     { "source": "/api/health", "destination": "/api/meta?op=health" },
@@ -32,6 +34,9 @@
     { "source": "/api/run_agent", "destination": "/api/science?op=run_agent" },
     { "source": "/api/validate_stage", "destination": "/api/science?op=validate_stage" },
     { "source": "/api/artifact", "destination": "/api/science?op=artifact" }
+  ],
+  "crons": [
+    { "path": "/api/watch_cron", "schedule": "0 12 * * *" }
   ],
   "headers": [{
     "source": "/api/(.*)",
