@@ -107,6 +107,7 @@ class handler(BaseHTTPRequestHandler):
                     return
                 papers = workspace.list_papers(folder_id)
                 paper_ids = [p["canonical_id"] for p in papers if p.get("canonical_id")]
+                paper_ids = list(dict.fromkeys(paper_ids))
                 corpus_hash = hashlib.sha256("\n".join(sorted(paper_ids)).encode("utf-8")).hexdigest()[:20]
                 session_id = body.get("session_id")
                 session_synced = False
@@ -124,8 +125,8 @@ class handler(BaseHTTPRequestHandler):
                             "requested_folder_id": folder_id,
                         })
                         return
-                    state.candidate_paper_ids = list(dict.fromkeys(paper_ids))
-                    state.selected_paper_ids = [x for x in state.selected_paper_ids if x in set(paper_ids)]
+                    state.candidate_paper_ids = list(paper_ids)
+                    state.selected_paper_ids = list(paper_ids)
                     scoped_store = UserSnapshotStore(user, folder_id=folder_id)
                     scoped_store.save_state(state, project_id=state.project_id)
                     session_synced = True
