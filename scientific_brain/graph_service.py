@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
@@ -94,18 +95,69 @@ class ScientificGraphService:
         self.graph_store.replace_contradictions(results)
         return results
 
+    @staticmethod
+    def _question_terms(question: str) -> set[str]:
+        stop = {
+            "what", "which", "when", "where", "how", "does", "with", "from", "that", "this", "into",
+            "que", "qué", "cual", "cuál", "como", "cómo", "para", "con", "por", "una", "uno", "las", "los",
+            "the", "and", "are", "del", "entre", "sobre", "under", "bajo",
+        }
+        return {
+            word
+            for word in re.findall(r"[a-záéíóúüñ0-9][a-záéíóúüñ0-9_+./-]{2,}", question.casefold())
+            if word not in stop and not word.isdigit()
+        }
+
+    def _claims_for_open_question(
+        self,
+        question: str,
+        claims: list[ScientificGraphNode],
+        *,
+        limit: int = 80,
+    ) -> list[ScientificGraphNode]:
+        """Select bounded, question-relevant validated claims when no contradiction exists.
+
+        This is retrieval only. It does not infer support, novelty or causality.
+        """
+        terms = self._question_terms(question)
+        ranked: list[tuple[int, str, ScientificGraphNode]] = []
+        for claim in claims:
+            haystack = f"{claim.label} {claim.properties}".casefold()
+            score = sum(1 for term in terms if term in haystack)
+            ranked.append((score, claim.node_id, claim))
+        ranked.sort(key=lambda item: (-item[0], item[1]))
+        if terms and any(score > 0 for score, _, _ in ranked):
+            relevant = [claim for score, _, claim in ranked if score > 0]
+            # Preserve some broader corpus context so the model can consider alternatives
+            # rather than overfit only to lexical matches.
+            broader = [claim for score, _, claim in ranked if score == 0]
+            return (relevant[:60] + broader[:20])[:limit]
+        return [claim for _, _, claim in ranked[:limit]]
+
     def generate_hypotheses(self, question: str) -> HypothesisCompetition:
+        question = question.strip()
+        if not question:
+            raise ValueError("question is required")
+
         contradictions = self.graph_store.list_contradictions(limit=1000)
-        if not contradictions:
-            raise ValueError("No contradiction candidates are available. Run contradiction analysis first.")
         nodes = self.graph_store.list_nodes(limit=10000)
         node_by_id = {n.node_id: n for n in nodes}
+        all_claims = [n for n in nodes if n.node_type == GraphNodeType.CLAIM]
+        if not all_claims:
+            raise ValueError(
+                "No validated claim nodes are available. Build the scientific graph from full-text-reviewed papers first."
+            )
+
         involved_claim_ids = {
             cid
             for item in contradictions
             for cid in (item.claim_a_id, item.claim_b_id)
         }
-        claims = [node_by_id[cid] for cid in involved_claim_ids if cid in node_by_id]
+        if involved_claim_ids:
+            claims = [node_by_id[cid] for cid in involved_claim_ids if cid in node_by_id][:100]
+        else:
+            claims = self._claims_for_open_question(question, all_claims, limit=80)
+            involved_claim_ids = {claim.node_id for claim in claims}
 
         edges = self.graph_store.list_edges(limit=20000)
         evidence_ids = {
@@ -117,7 +169,8 @@ class ScientificGraphService:
             node_by_id[eid]
             for eid in evidence_ids
             if eid in node_by_id and node_by_id[eid].node_type == GraphNodeType.EVIDENCE
-        ]
+        ][:160]
+
         competition = HypothesisCompetitionAgent(self.provider).generate(
             question,
             claims,

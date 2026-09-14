@@ -15,6 +15,8 @@
     '/assets/scientific_format_v19.js',
     '/assets/state_art_map_v20.js',
     '/assets/autonomous_discovery_v21.js',
+    '/assets/research_questions_v22.js',
+    '/assets/research_questions_v22_gap_mode.js',
   ];
 
   const NativeMutationObserver = window.MutationObserver;

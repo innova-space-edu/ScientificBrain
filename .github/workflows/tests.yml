@@ -48,3 +48,5 @@ jobs:
           node --check assets/scientific_format_v19.js
           node --check assets/state_art_map_v20.js
           node --check assets/autonomous_discovery_v21.js
+          node --check assets/research_questions_v22.js
+          node --check assets/research_questions_v22_gap_mode.js
