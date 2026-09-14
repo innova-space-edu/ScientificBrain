@@ -44,3 +44,4 @@ jobs:
           node --check assets/research_workspace_v15.js
           node --check assets/research_workspace_v16.js
           node --check assets/research_workspace_v17.js
+          node --check assets/research_flow_v18.js

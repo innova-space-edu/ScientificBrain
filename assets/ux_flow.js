@@ -11,6 +11,7 @@
     '/assets/research_workspace_v15.js',
     '/assets/research_workspace_v16.js',
     '/assets/research_workspace_v17.js',
+    '/assets/research_flow_v18.js',
   ];
 
   const NativeMutationObserver = window.MutationObserver;
