@@ -10,8 +10,8 @@ from scientific_brain.auth import require_user
 from scientific_brain.collaboration import AGENT_ROLES
 from scientific_brain.providers import provider_from_env
 from scientific_brain.professional_exports import ProfessionalExportService
-from scientific_brain.quality_control import ScientificQualityControlService
 from scientific_brain.research_versions import ResearchVersionStore
+from scientific_brain.scientific_notebook import ScientificNotebookService
 
 
 register_advanced_roles(AGENT_ROLES)
@@ -45,7 +45,7 @@ class handler(BaseHTTPRequestHandler):
     def _service(self, user, folder_id: str):
         if not folder_id:
             raise ValueError("folder_id is required")
-        return ScientificQualityControlService(
+        return ScientificNotebookService(
             user=user,
             folder_id=folder_id,
             provider=provider_from_env("cloud", task="research"),

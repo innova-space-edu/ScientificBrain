@@ -6,7 +6,7 @@ from urllib.parse import parse_qs, urlparse
 
 from scientific_brain.auth import require_user
 from scientific_brain.corpus_intelligence import CorpusIntelligenceService
-from scientific_brain.corpus_intelligence_v174 import ResilientTelemetryCorpusIntelligenceService
+from scientific_brain.corpus_intelligence_v19 import ScientificNotebookCorpusIntelligenceService
 from scientific_brain.literature_watch import LiteratureWatchService
 from scientific_brain.observability import ScientificObservabilityService
 from scientific_brain.workspaces import UserWorkspaceStore
@@ -104,7 +104,7 @@ class handler(BaseHTTPRequestHandler):
                 self._write(200, result)
                 return
             if op == "ask":
-                result = ResilientTelemetryCorpusIntelligenceService(user, folder_id).ask(
+                result = ScientificNotebookCorpusIntelligenceService(user, folder_id).ask(
                     str(body.get("question") or ""),
                     thread_id=str(body.get("thread_id") or "").strip() or None,
                     language=str(body.get("language") or "es"),
