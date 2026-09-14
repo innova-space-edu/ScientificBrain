@@ -56,7 +56,6 @@ class DefinedProjectService:
                 AuditEvent(event="folder_scope_attached", detail=folder_id)
             )
 
-        artifact_store = LocalArtifactStore(self.memory)
         project_artifact = ArtifactRecord(
             artifact_id=f"{state.session_id}:project_definition:r1",
             session_id=state.session_id,
@@ -67,12 +66,16 @@ class DefinedProjectService:
             revision=1,
             accepted=True,
         )
-        artifact_store.save(project_artifact)
-        if self.snapshot_store:
-            self.snapshot_store.save_artifact(project_artifact)
 
+        # Persist the parent session before child artifacts. Supabase enforces
+        # scibrain_artifacts.session_id -> scibrain_states.session_id.
         self.memory.record_gate(gate, session_id=state.session_id)
         self.memory.save_state(state)
         if self.snapshot_store:
             self.snapshot_store.save_state(state, project_id=project.project_id)
+
+        artifact_store = LocalArtifactStore(self.memory)
+        artifact_store.save(project_artifact)
+        if self.snapshot_store:
+            self.snapshot_store.save_artifact(project_artifact)
         return state
