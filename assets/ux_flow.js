@@ -14,6 +14,7 @@
     '/assets/research_flow_v18.js',
     '/assets/scientific_format_v19.js',
     '/assets/state_art_map_v20.js',
+    '/assets/autonomous_discovery_v21.js',
   ];
 
   const NativeMutationObserver = window.MutationObserver;

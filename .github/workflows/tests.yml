@@ -25,7 +25,7 @@ jobs:
       - name: API import smoke test
         run: |
           python -c "import api.jobs, api.search, api.run_job, api.paper, api.research, api.science, api.collaboration, api.orchestrate, api.corpus, api.watch_cron"
-          python -c "import scientific_brain.paper_intelligence, scientific_brain.paper_compare, scientific_brain.research_versions, scientific_brain.vision_provider, scientific_brain.corpus_intelligence, scientific_brain.corpus_intelligence_v16, scientific_brain.corpus_intelligence_v19, scientific_brain.literature_watch, scientific_brain.observability, scientific_brain.evidence_bound_collaboration, scientific_brain.telemetry_provider, scientific_brain.quality_control, scientific_brain.professional_exports, scientific_brain.scientific_response, scientific_brain.scientific_notebook, scientific_brain.state_of_art"
+          python -c "import scientific_brain.paper_intelligence, scientific_brain.paper_compare, scientific_brain.research_versions, scientific_brain.vision_provider, scientific_brain.corpus_intelligence, scientific_brain.corpus_intelligence_v16, scientific_brain.corpus_intelligence_v19, scientific_brain.literature_watch, scientific_brain.observability, scientific_brain.evidence_bound_collaboration, scientific_brain.telemetry_provider, scientific_brain.quality_control, scientific_brain.professional_exports, scientific_brain.scientific_response, scientific_brain.scientific_notebook, scientific_brain.state_of_art, scientific_brain.autonomous_discovery"
       - name: Frontend JavaScript syntax
         run: |
           node --check assets/i18n.js
@@ -47,3 +47,4 @@ jobs:
           node --check assets/research_flow_v18.js
           node --check assets/scientific_format_v19.js
           node --check assets/state_art_map_v20.js
+          node --check assets/autonomous_discovery_v21.js

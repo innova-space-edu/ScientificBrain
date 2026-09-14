@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "scientific-brain"
-version = "0.20.0"
+version = "0.21.0"
 description = "Evidence-grounded scientific memory and reasoning across research disciplines"
 readme = "README.md"
 requires-python = ">=3.11"

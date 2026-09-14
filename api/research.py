@@ -9,6 +9,7 @@ from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 
 from scientific_brain.auth import require_user
+from scientific_brain.autonomous_discovery import AutonomousDiscoveryService
 from scientific_brain.jobs import SUPPORTED_JOB_TYPES, ScientificJobProcessor
 from scientific_brain.providers import provider_from_env
 from scientific_brain.research_search import ResearchSearchService
@@ -54,7 +55,6 @@ def _job_deadline_seconds() -> int:
         requested = int(os.getenv("SCIBRAIN_JOB_SOFT_DEADLINE_SECONDS", "225"))
     except ValueError:
         requested = 225
-    # Reserve at least ~60 s of a 300 s function for status recovery and response I/O.
     return max(60, min(requested, 240))
 
 
@@ -86,23 +86,37 @@ class handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", "0"))
         return json.loads(self.rfile.read(length) or b"{}")
 
+    def _discovery(self, user, folder_id: str, *, with_provider: bool = False) -> AutonomousDiscoveryService:
+        if not folder_id:
+            raise ValueError("folder_id is required")
+        provider = provider_from_env("cloud", task="research") if with_provider else object()
+        return AutonomousDiscoveryService(user=user, folder_id=folder_id, provider=provider)
+
     def do_GET(self):
         user = require_user(self)
         if not user:
             return
         op = self._op()
-        if op != "jobs":
-            self._write(404, {"error": "unknown_research_operation", "op": op})
-            return
         try:
             query = self._query()
-            session_id = (query.get("session_id") or [None])[0]
-            folder_id = (query.get("folder_id") or [None])[0]
-            limit = int((query.get("limit") or ["100"])[0])
-            store = UserSnapshotStore(user, folder_id=folder_id)
-            self._write(200, {
-                "jobs": store.list_jobs(session_id=session_id, folder_id=folder_id, limit=limit)
-            })
+            if op == "jobs":
+                session_id = (query.get("session_id") or [None])[0]
+                folder_id = (query.get("folder_id") or [None])[0]
+                limit = int((query.get("limit") or ["100"])[0])
+                store = UserSnapshotStore(user, folder_id=folder_id)
+                self._write(200, {
+                    "jobs": store.list_jobs(session_id=session_id, folder_id=folder_id, limit=limit)
+                })
+                return
+            if op == "screening":
+                folder_id = str((query.get("folder_id") or [""])[0]).strip()
+                decision = str((query.get("decision") or [""])[0]).strip() or None
+                limit = int((query.get("limit") or ["200"])[0])
+                self._write(200, self._discovery(user, folder_id, with_provider=False).list_candidates(decision=decision, limit=limit))
+                return
+            self._write(404, {"error": "unknown_research_operation", "op": op})
+        except (ValueError, KeyError) as exc:
+            self._write(400, {"error": type(exc).__name__, "detail": str(exc)})
         except Exception as exc:
             self._write(500, {"error": type(exc).__name__, "detail": str(exc)})
 
@@ -144,6 +158,56 @@ class handler(BaseHTTPRequestHandler):
                 result["folder_id"] = folder_id
                 result["folder_name"] = folder.get("name")
                 self._write(200, result)
+                return
+
+            if op == "autonomous_discovery":
+                folder_id = str(body.get("folder_id") or "").strip()
+                _configure_research_provider_timeout()
+                service = self._discovery(user, folder_id, with_provider=True)
+                deadline = _job_deadline_seconds()
+                elapsed = int(time.monotonic() - invocation_started)
+                remaining = max(1, deadline - elapsed)
+                try:
+                    result = _run_with_soft_timeout(
+                        lambda: service.run(
+                            focus=str(body.get("focus") or ""),
+                            from_year=int(body.get("from_year") or 1900),
+                            max_queries=max(1, min(int(body.get("max_queries") or 4), 6)),
+                            per_query=max(5, min(int(body.get("per_query") or 12), 25)),
+                            language=str(body.get("language") or "es"),
+                        ),
+                        remaining,
+                    )
+                except SoftJobTimeout as exc:
+                    self._write(504, {
+                        "error": "discovery_soft_timeout",
+                        "detail": str(exc),
+                        "retryable": True,
+                        "note": "Completed screening rows remain persisted; run again with fewer queries if needed.",
+                    })
+                    return
+                self._write(200, result)
+                return
+
+            if op == "screen_decision":
+                folder_id = str(body.get("folder_id") or "").strip()
+                candidate_id = str(body.get("candidate_id") or "").strip()
+                if not candidate_id:
+                    raise ValueError("candidate_id is required")
+                result = self._discovery(user, folder_id, with_provider=False).set_decision(
+                    candidate_id,
+                    str(body.get("decision") or "pending"),
+                    str(body.get("reason") or ""),
+                )
+                self._write(200, result)
+                return
+
+            if op == "add_candidate":
+                folder_id = str(body.get("folder_id") or "").strip()
+                candidate_id = str(body.get("candidate_id") or "").strip()
+                if not candidate_id:
+                    raise ValueError("candidate_id is required")
+                self._write(200, self._discovery(user, folder_id, with_provider=False).add_candidate(candidate_id))
                 return
 
             if op == "jobs":
