@@ -6,10 +6,25 @@ from typing import Any
 from .collaboration import AGENT_ROLES, _parse_json_response, _short
 from .quality_control import ScientificQualityControlService
 from .scientific_response import clean_refs, normalize_scientific_response, render_scientific_response
+from .state_of_art import build_state_of_art_matrix
 
 
 class ScientificNotebookService(ScientificQualityControlService):
-    """v0.19 scientific notebook: page-grounded reasoning, LaTeX, quantitative checks and Python verification."""
+    """Scientific notebook with page-grounded reasoning and a live structured state of the art."""
+
+    def get_workspace(self) -> dict[str, Any]:
+        workspace = super().get_workspace()
+        try:
+            workspace["literature_matrix"] = build_state_of_art_matrix(self._paper_rows())
+        except Exception as exc:
+            workspace["literature_matrix"] = {
+                "version": "state_of_art_matrix_v1",
+                "rows": [],
+                "coverage": {},
+                "recurring_dimensions": {},
+                "error": f"{type(exc).__name__}: {exc}",
+            }
+        return workspace
 
     def discuss(
         self,
@@ -29,7 +44,6 @@ class ScientificNotebookService(ScientificQualityControlService):
         if not document:
             raise KeyError("research_document_not_found")
         if section_key and section_key not in (document.get("sections") or {}):
-            # Keep compatibility with newly-created sections while rejecting arbitrary keys.
             from .evidence_bound_collaboration import DEEP_SECTION_KEYS
             if section_key not in DEEP_SECTION_KEYS:
                 raise ValueError("unknown section")
@@ -63,7 +77,7 @@ class ScientificNotebookService(ScientificQualityControlService):
             for source in sorted(manifest, key=lambda x: int(x.get("citation_number") or 999999))
         )
 
-        system = f"""You are {label}, operating inside ScientificBrain Scientific Notebook v0.19.
+        system = f"""You are {label}, operating inside ScientificBrain Scientific Notebook v0.20.
 Role: {purpose}
 Answer in language code {language}.
 

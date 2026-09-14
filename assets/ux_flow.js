@@ -13,6 +13,7 @@
     '/assets/research_workspace_v17.js',
     '/assets/research_flow_v18.js',
     '/assets/scientific_format_v19.js',
+    '/assets/state_art_map_v20.js',
   ];
 
   const NativeMutationObserver = window.MutationObserver;
