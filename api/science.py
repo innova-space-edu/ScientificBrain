@@ -10,6 +10,7 @@ from scientific_brain.graph_service import ScientificGraphService
 from scientific_brain.graph_store import ScientificGraphStore
 from scientific_brain.nvidia_provider import nvidia_provider_from_env, physics_toolkit_manifest
 from scientific_brain.persistence import hydrate_memory_from_snapshot
+from scientific_brain.physics_jobs import physics_execution_profiles, prepare_physics_job
 from scientific_brain.physics_tools import (
     monte_carlo_samples,
     physics_worker_status,
@@ -74,6 +75,9 @@ class handler(BaseHTTPRequestHandler):
             if op == "physics_workers":
                 self._write(200, physics_worker_status())
                 return
+            if op == "physics_profiles":
+                self._write(200, physics_execution_profiles())
+                return
             folder_id = (query.get("folder_id") or [""])[0]
             if not folder_id:
                 raise ValueError("folder_id is required")
@@ -114,6 +118,9 @@ class handler(BaseHTTPRequestHandler):
         op = self._op()
         try:
             payload = self._body()
+            if op == "physics_prepare_job":
+                self._write(200, prepare_physics_job(payload))
+                return
             if op == "physics_route":
                 self._write(200, route_plasma_model(payload))
                 return
