@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Qué hace ScientificBrain</title>
+<link rel="stylesheet" href="/assets/styles.css"/>
+<link rel="stylesheet" href="/assets/scientific_tools.css"/>
+</head>
+<body class="tools-shell">
+<header class="tools-top">
+  <div class="tools-brand"><div class="mark">SB</div><div><strong>ScientificBrain</strong><div class="muted">Capacidades científicas</div></div></div>
+  <div class="tools-actions"><a class="ghost tools-link" href="/scientific-tools">Herramientas científicas</a><a class="ghost tools-link" href="/">Inicio</a></div>
+</header>
+<main class="tools-main">
+<section class="tools-card capability-hero">
+<p class="eyebrow">Scientific research operating system</p>
+<h1>Qué hace ScientificBrain y qué puede generar</h1>
+<p>ScientificBrain une investigación documental, razonamiento científico, simulación numérica, cómputo CPU/GPU/HPC, análisis de datos, incertidumbre y aprendizaje científico. La IA no inventa los resultados de los solvers: prepara, ejecuta, valida y organiza experimentos numéricos reproducibles.</p>
+</section>
+
+<section class="cap-grid">
+<article class="tools-card"><h2>1. Investigación y evidencia</h2><p>Busca y organiza literatura, PDF, DOI, afirmaciones, evidencias, contradicciones, limitaciones y estado del arte. Puede producir preguntas científicas, hipótesis falsables, matrices de evidencia, revisiones críticas y borradores sustentados.</p></article>
+<article class="tools-card"><h2>2. Definición física</h2><p>Calcula escalas y números de régimen, explicita ecuaciones y cierres, y decide qué nivel debe evaluarse: MHD, Extended-MHD, Hybrid-PIC, full PIC o transporte Monte Carlo.</p></article>
+<article class="tools-card"><h2>3. Simulación física</h2><p>Prepara jobs para FLASH, WarpX, PIConGPU, EDIPIC-2D y Geant4. Los trabajos pesados pueden enviarse a workers propios, clusters HPC o Google Cloud Batch/Compute Engine.</p></article>
+<article class="tools-card"><h2>4. Datos científicos sintéticos</h2><p>Los solvers producen campos, partículas, momentos, energía, choques, distribuciones y scores físicos. ScientificBrain preserva HDF5/openPMD y construye datasets derivados sin sustituir el dato nativo.</p></article>
+<article class="tools-card"><h2>5. Monte Carlo y UQ</h2><p>Genera muestras reproducibles de parámetros, campañas probabilísticas, distribuciones de observables, intervalos, cuantiles y presupuestos de incertidumbre; separa incertidumbre física, numérica, estocástica y de surrogate.</p></article>
+<article class="tools-card"><h2>6. Diagnósticos y validación</h2><p>Puede extraer E, B, J, densidad, temperatura, phase space, energía, posición/velocidad/espesor de shock, conservación, div(B), ruido PIC y convergencia de malla, tiempo y partículas.</p></article>
+<article class="tools-card"><h2>7. Multi-fidelity</h2><p>Combina campañas de distinto costo: por ejemplo muchos FLASH, menos Hybrid-PIC y pocos full-PIC. Mantiene explícita la fidelidad y cuantifica discrepancias en vez de mezclar resultados como equivalentes.</p></article>
+<article class="tools-card"><h2>8. PhysicsNeMo</h2><p>Convierte simulaciones validadas en datasets para FNO/PINO y otros surrogates, entrena en una o varias GPU, valida contra runs retenidos y conserva un dominio de validez explícito.</p></article>
+<article class="tools-card"><h2>9. Active learning</h2><p>Después de entrenar un surrogate, identifica regiones de alta incertidumbre y puede proponer la siguiente simulación y su fidelidad. El ciclo puede ser: predecir → medir incertidumbre → ejecutar nuevo solver → validar → reentrenar.</p></article>
+<article class="tools-card"><h2>10. Reproducibilidad</h2><p>Genera manifests de jobs, versiones de solver, parámetros, seeds, recursos, outputs, checkpoints, criterios de aceptación, provenance y artefactos para que una simulación o entrenamiento pueda auditarse.</p></article>
+</section>
+
+<section class="tools-card">
+<h2>Flujo completo</h2>
+<pre class="tools-output flow-output">Pregunta científica
+  ↓
+evidencia + teoría + hipótesis
+  ↓
+router físico
+  ↓
+FLASH / WarpX Hybrid / WarpX PIC / PIConGPU / EDIPIC-2D / Geant4
+  ↓
+worker local / cluster / Google Cloud Batch CPU-GPU
+  ↓
+HDF5 / openPMD / outputs nativos
+  ↓
+diagnósticos + validación + incertidumbre
+  ↓
+dataset multi-fidelity
+  ↓
+PhysicsNeMo
+  ↓
+surrogate validado
+  ↓
+active learning
+  ↓
+ScientificBrain decide el siguiente experimento numérico</pre>
+</section>
+
+<section class="tools-card" style="margin-top:22px">
+<h2>Qué no hace</h2>
+<p>ScientificBrain no convierte una salida de IA en una medición física, no supone que full PIC es siempre mejor, no reemplaza la validación experimental, y no considera un surrogate válido fuera del dominio donde fue contrastado. Las simulaciones generan datos sintéticos basados en modelos físicos; deben conservar sus supuestos, resolución, incertidumbre y limitaciones.</p>
+</section>
+</main>
+</body></html>

@@ -382,6 +382,37 @@ ScientificBrain now prepares typed physics job manifests for FLASH, WarpX, PICon
 
 Each prepared job includes solver/action/model identity, input artifact reference, resource request, expected outputs/validation requirements and an execution profile. Heavy execution remains delegated to a server-configured worker/HPC endpoint.
 
+## What ScientificBrain can generate
+
+ScientificBrain is not only a chat/reasoning layer. It can produce traceable scientific artifacts across the full research-compute loop:
+
+- literature/evidence graphs, contradictions, hypotheses and research plans;
+- physical-regime calculations and solver/model hierarchies;
+- reproducible jobs for FLASH, WarpX, PIConGPU, EDIPIC-2D, Geant4 and PhysicsNeMo;
+- native simulation data (HDF5, openPMD and solver-specific outputs);
+- derived field/particle/shock/energy diagnostics;
+- Monte Carlo campaigns and uncertainty distributions;
+- canonical and multi-fidelity scientific datasets;
+- PhysicsNeMo/FNO/PINO surrogate checkpoints and predictions;
+- active-learning query sets for choosing the next expensive simulation;
+- manifests, checkpoints, validation matrices and provenance for reproducibility.
+
+Public explanation page:
+
+https://scientific-brain.vercel.app/scientific-capabilities
+
+The solver outputs are synthetic scientific data produced by explicit physical/numerical models. ScientificBrain does not relabel model output as experimental measurement and does not accept a surrogate outside its validated domain by default.
+
+## Google Cloud Batch / GPU execution — v0.26
+
+ScientificBrain can now translate a validated Physics Job into a Google Cloud Batch job. Google Batch can provision Compute Engine CPU or GPU resources, execute a **server-approved solver container**, stream logs to Cloud Logging and use Cloud Storage for input/output artifacts.
+
+The browser cannot specify container images, shell commands, machine types, service-account identities or Google credentials. These are stored in server configuration. GPU profiles can be configured for WarpX, PIConGPU and PhysicsNeMo; CPU profiles can be used for FLASH, EDIPIC-2D and Geant4 as appropriate.
+
+Authentication uses Google Application Default Credentials where possible. For production on Google Cloud, an attached least-privilege service account is preferred; from external hosting, Workload Identity Federation is preferred over long-lived service-account keys.
+
+See `docs/GOOGLE_CLOUD_BATCH.md` and `docs/SCIENTIFIC_COMPUTE.md`.
+
 ## Development
 
 ```bash
