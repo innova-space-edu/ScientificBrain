@@ -66,6 +66,19 @@
     </section>
 
     <section class="tools-card" style="margin-top:22px">
+      <div class="card-head"><div><p class="eyebrow">Results ingestion</p><h2>Recuperar resultados de Google Cloud</h2></div></div>
+      <p>Cuando el solver termina, su contenedor escribe <code>scientificbrain-output.json</code> y los archivos nativos bajo el prefijo exclusivo del job. ScientificBrain puede listar ese prefijo y recuperar el manifiesto sin exponer acceso arbitrario al bucket.</p>
+      <div class="input-grid two-cols">
+        <label>ScientificBrain job ID<input id="result-job-id" placeholder="UUID del job científico"/></label>
+        <div class="tools-actions" style="align-self:end">
+          <button id="list-gcp-outputs" class="secondary">Listar archivos</button>
+          <button id="get-gcp-manifest" class="secondary">Leer manifiesto</button>
+        </div>
+      </div>
+      <p class="tools-note">El ID se completa automáticamente al preparar un job en esta sesión. Los endpoints solo acceden a <code>scientificbrain/jobs/&lt;job_id&gt;/</code>.</p>
+    </section>
+
+    <section class="tools-card" style="margin-top:22px">
       <h2>Router físico de plasma</h2>
       <p class="tools-note">Calcula escalas de Debye, skin depths, gyro-radii, beta y Alfvén Mach para proponer una jerarquía de modelos. Es un screening: no reemplaza validación física.</p>
       <div class="input-grid">
