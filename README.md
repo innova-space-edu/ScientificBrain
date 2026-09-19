@@ -358,6 +358,12 @@ The Scientific Tools workspace now exposes source-grounded physics tooling indep
 
 Heavy simulations are never executed synchronously inside the browser or Vercel function. ScientificBrain submits immutable jobs only to workers configured in `SCIBRAIN_PHYSICS_WORKERS_JSON`. Browser requests cannot provide arbitrary worker URLs or worker tokens.
 
+## Reproducible physics jobs — v0.25
+
+ScientificBrain now prepares typed physics job manifests for FLASH, WarpX, PIConGPU, EDIPIC-2D, Geant4 and PhysicsNeMo. A browser may specify scientific parameters and resource requests, but cannot inject executable paths, shell commands, endpoint URLs, API keys, worker tokens or scheduler commands.
+
+Each prepared job includes solver/action/model identity, input artifact reference, resource request, expected outputs/validation requirements and an execution profile. Heavy execution remains delegated to a server-configured worker/HPC endpoint.
+
 ## Development
 
 ```bash

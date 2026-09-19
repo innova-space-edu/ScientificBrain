@@ -29,6 +29,13 @@
     state.status=status;state.toolkit=toolkit;state.workers=workers;render();
   }
   function num(id){const v=$(id).value.trim();return v===''?null:Number(v)}
+  async function prepareJob(){
+    try{
+      let parameters;try{parameters=JSON.parse($('#job-parameters').value||'{}')}catch{throw new Error('Parámetros JSON inválidos')}
+      const payload={solver:$('#job-solver').value,action:$('#job-action').value,model:$('#job-model').value.trim(),input_artifact:$('#job-input').value.trim(),parameters,resources:{gpus:Number($('#job-gpus').value||0),cpus:4,nodes:1,memory_gb:8,wall_minutes:60}};
+      const r=await api('/api/science?op=physics_prepare_job',{method:'POST',body:JSON.stringify(payload)});out('Job científico preparado',r);
+    }catch(e){out('Error job',e.message)}
+  }
   async function runRouter(){
     try{
       const payload={ne:num('#r-ne'),B:num('#r-B'),Te_ev:num('#r-Te'),Ti_ev:num('#r-Ti'),L:num('#r-L'),U:num('#r-U'),A:num('#r-A'),Z:num('#r-Z'),mfp:num('#r-mfp'),needs_electron_kinetics:$('#r-electron').checked,low_temperature_2d:$('#r-lowt').checked,particle_through_matter:$('#r-matter').checked};
@@ -43,5 +50,5 @@
   }
   async function runChat(){try{const prompt=$('#nvidia-prompt').value.trim();if(!prompt)throw new Error('Escribe una consulta');const r=await api('/api/science?op=nvidia_invoke',{method:'POST',body:JSON.stringify({capability:'nvidia-chat',input:{prompt}})});out('NVIDIA API',r)}catch(e){out('Error NVIDIA',e.message)}}
   async function runCapability(){try{const capability=$('#capability-select').value;if(!capability)throw new Error('No hay capacidad seleccionada');let input;try{input=JSON.parse($('#capability-input').value||'{}')}catch{throw new Error('Entrada JSON inválida')}const r=await api('/api/science?op=nvidia_invoke',{method:'POST',body:JSON.stringify({capability,input})});out(capability,r)}catch(e){out('Error capacidad',e.message)}}
-  window.addEventListener('DOMContentLoaded',()=>{$('#run-physics-router').addEventListener('click',runRouter);$('#run-monte-carlo').addEventListener('click',runMonteCarlo);$('#run-nvidia-chat').addEventListener('click',runChat);$('#run-capability').addEventListener('click',runCapability);$('#clear-tools-output').addEventListener('click',()=>$('#tools-output').textContent='ScientificBrain Physics Tools listo.');load().catch(e=>out('Inicialización',e.message))});
+  window.addEventListener('DOMContentLoaded',()=>{$('#prepare-physics-job').addEventListener('click',prepareJob);$('#run-physics-router').addEventListener('click',runRouter);$('#run-monte-carlo').addEventListener('click',runMonteCarlo);$('#run-nvidia-chat').addEventListener('click',runChat);$('#run-capability').addEventListener('click',runCapability);$('#clear-tools-output').addEventListener('click',()=>$('#tools-output').textContent='ScientificBrain Physics Tools listo.');load().catch(e=>out('Inicialización',e.message))});
 })();

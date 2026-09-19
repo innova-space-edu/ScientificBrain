@@ -43,6 +43,20 @@
     </section>
 
     <section class="tools-card" style="margin-top:22px">
+      <h2>Preparar job científico</h2>
+      <p class="tools-note">Genera un manifiesto reproducible y seguro. No ejecuta comandos y no permite URLs, tokens o ejecutables enviados por el navegador.</p>
+      <div class="input-grid">
+        <label>Solver<select id="job-solver"><option value="flash">FLASH</option><option value="warpx">WarpX</option><option value="picongpu">PIConGPU</option><option value="edipic2d">EDIPIC-2D</option><option value="geant4">Geant4</option><option value="physicsnemo">PhysicsNeMo</option></select></label>
+        <label>Acción<select id="job-action"><option value="run">run</option><option value="validate">validate</option><option value="sweep">sweep</option><option value="analyze">analyze</option><option value="train">train</option><option value="infer">infer</option></select></label>
+        <label>Modelo<input id="job-model" value="hall-mhd"/></label>
+        <label>Artefacto de entrada<input id="job-input" value="campaigns/example/input"/></label>
+        <label>GPU<input id="job-gpus" type="number" value="0" min="0"/></label>
+      </div>
+      <label>Parámetros JSON<textarea id="job-parameters">{"dimension":2}</textarea></label>
+      <div class="tools-actions"><button id="prepare-physics-job" class="secondary">Preparar manifiesto</button></div>
+    </section>
+
+    <section class="tools-card" style="margin-top:22px">
       <h2>Router físico de plasma</h2>
       <p class="tools-note">Calcula escalas de Debye, skin depths, gyro-radii, beta y Alfvén Mach para proponer una jerarquía de modelos. Es un screening: no reemplaza validación física.</p>
       <div class="input-grid">
