@@ -73,7 +73,12 @@ def google_cloud_setup_plan() -> dict[str, Any]:
             "available": all(wif_fields.values()),
             "fields": wif_fields,
             "expected_vercel_subject": (
-                "owner:innova-space-edu:project:scientific-brain:environment:production"
+                f"owner:{os.getenv('SCIBRAIN_VERCEL_TEAM', '').strip()}:"
+                f"project:{os.getenv('SCIBRAIN_VERCEL_PROJECT', '').strip()}:"
+                "environment:production"
+                if os.getenv("SCIBRAIN_VERCEL_TEAM", "").strip()
+                and os.getenv("SCIBRAIN_VERCEL_PROJECT", "").strip()
+                else None
             ),
         },
         "recommended_resources": {
