@@ -31,12 +31,12 @@ def test_status_never_exposes_nvidia_keys(monkeypatch):
     assert status["ngc_key_configured"] is True
 
 
-def test_physics_toolkit_keeps_future_extensions():
+def test_physics_toolkit_exposes_expanded_stack():
     manifest = physics_toolkit_manifest()
-    assert len(manifest["skills"]) == 15
-    assert "PIC/hybrid routing" in manifest["planned_extensions"]
-    assert "active learning" in manifest["planned_extensions"]
-    assert "direct ScientificBrain orchestration" in manifest["planned_extensions"]
+    assert len(manifest["skills"]) == 39
+    assert "PIC/hybrid routing" in manifest["implemented_extensions"]
+    assert "active learning" in manifest["implemented_extensions"]
+    assert "direct ScientificBrain orchestration" in manifest["implemented_extensions"]
 
 
 def test_custom_capability_is_server_configured(monkeypatch):
