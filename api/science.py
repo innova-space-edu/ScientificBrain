@@ -83,6 +83,9 @@ class handler(BaseHTTPRequestHandler):
             if op == "gcp_batch_status":
                 self._write(200, google_batch_from_env().status())
                 return
+            if op == "gcp_auth_probe":
+                self._write(200, google_batch_from_env().auth_probe())
+                return
             if op == "gcp_setup_plan":
                 self._write(200, google_cloud_setup_plan())
                 return
