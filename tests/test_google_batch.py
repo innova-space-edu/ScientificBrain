@@ -188,7 +188,7 @@ def test_output_manifest_fetches_fixed_manifest_object(monkeypatch):
     assert result["manifest"]["solver"] == "warpx"
     assert result["manifest"]["status"] == "succeeded"
     assert captured["params"]["alt"] == "media"
-    assert "scientificbrain-output.json" in captured["object"] if "object" in captured else True
+    assert "scientificbrain-output.json" in result["object"]
 
 
 def test_invalid_scientific_job_id_is_rejected(monkeypatch):
