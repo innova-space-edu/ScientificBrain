@@ -88,6 +88,18 @@ class handler(BaseHTTPRequestHandler):
                     raise ValueError("job_id is required")
                 self._write(200, google_batch_from_env().get(job_id))
                 return
+            if op == "gcp_output_list":
+                scientific_job_id = str((query.get("scientific_job_id") or [""])[0]).strip()
+                if not scientific_job_id:
+                    raise ValueError("scientific_job_id is required")
+                self._write(200, google_batch_from_env().list_outputs(scientific_job_id))
+                return
+            if op == "gcp_output_manifest":
+                scientific_job_id = str((query.get("scientific_job_id") or [""])[0]).strip()
+                if not scientific_job_id:
+                    raise ValueError("scientific_job_id is required")
+                self._write(200, google_batch_from_env().output_manifest(scientific_job_id))
+                return
             folder_id = (query.get("folder_id") or [""])[0]
             if not folder_id:
                 raise ValueError("folder_id is required")

@@ -413,6 +413,28 @@ Authentication uses Google Application Default Credentials where possible. For p
 
 See `docs/GOOGLE_CLOUD_BATCH.md` and `docs/SCIENTIFIC_COMPUTE.md`.
 
+## Google Cloud result ingestion — v0.27
+
+ScientificBrain can now complete the cloud simulation loop by reading only the output prefix assigned to a known scientific job. Solver containers are expected to write `scientificbrain-output.json` plus native outputs beneath:
+
+```text
+gs://<artifact-bucket>/scientificbrain/jobs/<scientific-job-id>/
+```
+
+The authenticated API can list files under that fixed prefix and retrieve the fixed manifest object. It does not expose arbitrary Cloud Storage browsing paths supplied by the browser.
+
+The Scientific Tools workspace can therefore perform:
+
+```text
+prepare job
+→ preview/submit Google Batch
+→ monitor Batch
+→ solver writes HDF5/openPMD/native output
+→ list output artifacts
+→ read scientificbrain-output.json
+→ diagnostics / validation / UQ / multi-fidelity / PhysicsNeMo
+```
+
 ## Development
 
 ```bash

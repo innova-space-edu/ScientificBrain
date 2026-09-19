@@ -118,3 +118,80 @@ def test_submit_uses_google_batch_create_api(monkeypatch):
     assert captured["url"].endswith("/projects/science-project/locations/us-central1/jobs")
     assert captured["params"]["job_id"].startswith("scibrain-warpx-")
     assert captured["headers"]["Authorization"] == "Bearer token"
+
+
+def test_list_outputs_scopes_to_scientific_job_prefix(monkeypatch):
+    _configured(monkeypatch)
+    provider = GoogleCloudBatch.from_env()
+
+    class Creds:
+        token = "token"
+    monkeypatch.setattr(provider, "_credentials", lambda: Creds())
+
+    class Response:
+        def raise_for_status(self): pass
+        def json(self):
+            return {
+                "items": [
+                    {
+                        "name": "scientificbrain/jobs/123e4567-e89b-12d3-a456-426614174000/openpmd/data.bp",
+                        "size": "42",
+                        "contentType": "application/octet-stream",
+                    },
+                    {
+                        "name": "other/prefix/ignore.txt",
+                        "size": "1",
+                    },
+                ]
+            }
+
+    captured = {}
+    def fake_get(url, **kwargs):
+        captured["url"] = url
+        captured["params"] = kwargs["params"]
+        return Response()
+
+    monkeypatch.setattr("scientific_brain.google_batch.httpx.get", fake_get)
+    result = provider.list_outputs("123e4567-e89b-12d3-a456-426614174000")
+    assert result["count"] == 1
+    assert result["items"][0]["relative_name"] == "openpmd/data.bp"
+    assert captured["params"]["prefix"].endswith("123e4567-e89b-12d3-a456-426614174000/")
+
+
+def test_output_manifest_fetches_fixed_manifest_object(monkeypatch):
+    _configured(monkeypatch)
+    provider = GoogleCloudBatch.from_env()
+
+    class Creds:
+        token = "token"
+    monkeypatch.setattr(provider, "_credentials", lambda: Creds())
+
+    class Response:
+        def raise_for_status(self): pass
+        def json(self):
+            return {
+                "schema_version": "0.1",
+                "job_id": "123e4567-e89b-12d3-a456-426614174000",
+                "solver": "warpx",
+                "status": "succeeded",
+                "native_artifacts": ["openpmd/data.bp"],
+            }
+
+    captured = {}
+    def fake_get(url, **kwargs):
+        captured["url"] = url
+        captured["params"] = kwargs["params"]
+        return Response()
+
+    monkeypatch.setattr("scientific_brain.google_batch.httpx.get", fake_get)
+    result = provider.output_manifest("123e4567-e89b-12d3-a456-426614174000")
+    assert result["manifest"]["solver"] == "warpx"
+    assert result["manifest"]["status"] == "succeeded"
+    assert captured["params"]["alt"] == "media"
+    assert "scientificbrain-output.json" in result["object"]
+
+
+def test_invalid_scientific_job_id_is_rejected(monkeypatch):
+    _configured(monkeypatch)
+    with pytest.raises(ValueError):
+        GoogleCloudBatch.from_env().list_outputs("../../etc/passwd")
