@@ -303,6 +303,15 @@ class GoogleCloudBatch:
             "Content-Type": "application/json",
         }
 
+    def auth_probe(self) -> dict[str, Any]:
+        credentials = self._credentials()
+        return {
+            "provider": "google_cloud",
+            "authenticated": bool(getattr(credentials, "token", "")),
+            "auth_mode": self.auth_mode(),
+            "workload_identity": vercel_wif_from_env().public_status(),
+        }
+
     def submit(self, payload: dict[str, Any]) -> dict[str, Any]:
         if not self.configured:
             raise RuntimeError("Google Cloud Batch is not fully configured")
