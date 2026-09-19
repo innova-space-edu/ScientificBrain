@@ -101,3 +101,40 @@ A successful physics run should leave:
 - validation status.
 
 ScientificBrain then ingests those artifacts for diagnostics, UQ, multi-fidelity datasets, PhysicsNeMo training and active learning.
+
+
+## Result ingestion
+
+A compliant solver container writes its outputs beneath the unique job prefix:
+
+```text
+gs://BUCKET/scientificbrain/jobs/<scientific-job-id>/
+```
+
+and writes a fixed machine-readable manifest at:
+
+```text
+scientificbrain-output.json
+```
+
+ScientificBrain exposes two authenticated result operations:
+
+```text
+GET /api/science?op=gcp_output_list&scientific_job_id=<UUID>
+GET /api/science?op=gcp_output_manifest&scientific_job_id=<UUID>
+```
+
+These operations derive the bucket/object prefix on the server from the configured artifact bucket and validated scientific job ID. They do not accept arbitrary bucket names or object paths from the browser.
+
+This closes the execution loop:
+
+```text
+PhysicsJob
+→ Google Batch
+→ solver container
+→ Cloud Storage output
+→ ScientificBrain manifest ingestion
+→ canonical diagnostics / validation
+→ UQ / multi-fidelity dataset
+→ PhysicsNeMo / active learning
+```
