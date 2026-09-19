@@ -44,12 +44,43 @@ def google_cloud_setup_plan() -> dict[str, Any]:
             "description": "Server-only solver to private image and machine/GPU mapping.",
         },
     ]
+    wif_fields = {
+        "project_number": bool(os.getenv("SCIBRAIN_GCP_PROJECT_NUMBER", "").strip()),
+        "pool_id": bool(os.getenv("SCIBRAIN_GCP_WIF_POOL_ID", "").strip()),
+        "provider_id": bool(os.getenv("SCIBRAIN_GCP_WIF_PROVIDER_ID", "").strip()),
+        "dispatcher_service_account": bool(
+            os.getenv("SCIBRAIN_GCP_DISPATCHER_SERVICE_ACCOUNT", "").strip()
+        ),
+        "vercel_oidc_token": bool(os.getenv("VERCEL_OIDC_TOKEN", "").strip()),
+    }
+
     return {
         "region": region,
         "ready": all(item["configured"] for item in variables),
         "variables": variables,
         "profiles_valid_json": profiles_valid,
         "configured_profile_names": sorted(profiles) if profiles_valid else [],
+        "workload_identity": {
+            "configured": all(
+                wif_fields[key]
+                for key in (
+                    "project_number",
+                    "pool_id",
+                    "provider_id",
+                    "dispatcher_service_account",
+                )
+            ),
+            "available": all(wif_fields.values()),
+            "fields": wif_fields,
+            "expected_vercel_subject": (
+                f"owner:{os.getenv('SCIBRAIN_VERCEL_TEAM', '').strip()}:"
+                f"project:{os.getenv('SCIBRAIN_VERCEL_PROJECT', '').strip()}:"
+                "environment:production"
+                if os.getenv("SCIBRAIN_VERCEL_TEAM", "").strip()
+                and os.getenv("SCIBRAIN_VERCEL_PROJECT", "").strip()
+                else None
+            ),
+        },
         "recommended_resources": {
             "artifact_registry_repository": os.getenv(
                 "SCIBRAIN_GCP_ARTIFACT_REPOSITORY", "scientificbrain-solvers"

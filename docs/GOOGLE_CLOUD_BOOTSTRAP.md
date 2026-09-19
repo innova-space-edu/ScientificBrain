@@ -33,3 +33,18 @@ FLASH can run on Google Cloud Batch. It must use a private image built from an a
 Use infra/gcp/batch-profiles.template.json after solver images are pushed. The L4/G2 entries are examples only: verify actual machine/GPU availability and quota in the selected region before production use.
 
 After these values are configured, the next phase is to build and push the real WarpX, PIConGPU, EDIPIC-2D, Geant4, PhysicsNeMo and private FLASH images, run one cheap smoke benchmark per solver, then launch the first cross-fidelity plasma benchmark from ScientificBrain.
+
+
+## Vercel production authentication
+
+ScientificBrain production uses Workload Identity Federation instead of a service-account JSON key.
+
+Verified identity:
+- issuer: https://oidc.vercel.com/innova-space-edu
+- audience: https://vercel.com/innova-space-edu
+- subject: owner:innova-space-edu:project:scientific-brain:environment:production
+- pool: vercel
+- provider: scientificbrain
+- dispatcher: scibrain-vercel-dispatcher@scientificbrain-compute.iam.gserviceaccount.com
+
+See `VERCEL_GCP_WIF.md` for the runtime STS and service-account impersonation flow.
