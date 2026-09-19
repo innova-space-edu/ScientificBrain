@@ -321,7 +321,15 @@ Public route names are preserved through `vercel.json` rewrites.
 
 ScientificBrain now separates scientific capabilities from the general inference router.
 
-The dedicated workspace is available at:
+The deployed application is:
+
+https://scientific-brain.vercel.app
+
+The dedicated Scientific Tools workspace is:
+
+https://scientific-brain.vercel.app/scientific-tools
+
+Local/development route:
 
 ```text
 /scientific-tools
@@ -342,6 +350,8 @@ Physics skills live in the separate repository:
 
 https://github.com/innova-space-edu/scientificbrain-physics-skills
 
+The physics-skills repository documents this ScientificBrain integration in `references/SCIENTIFICBRAIN_INTEGRATION.md`.
+
 Planned extensions preserved in the toolkit roadmap are **PIC/hybrid routing, additional diagnostics, distributed simulation/training, active learning, and direct ScientificBrain orchestration**.
 
 
@@ -357,6 +367,14 @@ The Scientific Tools workspace now exposes source-grounded physics tooling indep
 - centralized NVIDIA/BioNeMo/PhysicsNeMo capabilities when the NVIDIA credential is available.
 
 Heavy simulations are never executed synchronously inside the browser or Vercel function. ScientificBrain submits immutable jobs only to workers configured in `SCIBRAIN_PHYSICS_WORKERS_JSON`. Browser requests cannot provide arbitrary worker URLs or worker tokens.
+
+## Public Scientific Tools page
+
+The physics stack described below is exposed through the authenticated ScientificBrain interface at:
+
+https://scientific-brain.vercel.app/scientific-tools
+
+This page is the user-facing entry point for the plasma model router, Monte Carlo utilities, solver/HPC status, NVIDIA/NIM capabilities, PhysicsNeMo/BioNeMo status and reproducible physics-job preparation.
 
 ## Reproducible physics jobs — v0.25
 
