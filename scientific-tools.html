@@ -10,7 +10,7 @@
 <body class="tools-shell">
   <header class="tools-top">
     <div class="tools-brand"><div class="mark">SB</div><div><strong>ScientificBrain</strong><div class="muted">Herramientas científicas</div></div></div>
-    <div class="tools-actions"><span id="tools-version" class="badge">v—</span><a class="ghost tools-link" href="/">← Volver a ScientificBrain</a></div>
+    <div class="tools-actions"><span id="tools-version" class="badge">v—</span><a class="ghost tools-link" href="/scientific-capabilities">Qué hace ScientificBrain</a><a class="ghost tools-link" href="/">← Volver a ScientificBrain</a></div>
   </header>
   <main class="tools-main">
     <section class="tools-hero">
@@ -54,6 +54,15 @@
       </div>
       <label>Parámetros JSON<textarea id="job-parameters">{"dimension":2}</textarea></label>
       <div class="tools-actions"><button id="prepare-physics-job" class="secondary">Preparar manifiesto</button></div>
+    </section>
+
+
+    <section class="tools-card" style="margin-top:22px">
+      <div class="card-head"><div><p class="eyebrow">Cloud compute</p><h2>Google Cloud Batch / Compute Engine</h2></div><a class="ghost tools-link" href="/scientific-capabilities">Qué puede generar ScientificBrain →</a></div>
+      <p>ScientificBrain puede traducir un Physics Job validado a Google Cloud Batch. Batch aprovisiona la VM CPU/GPU, ejecuta una imagen de solver aprobada y deja resultados en Cloud Storage/Cloud Logging.</p>
+      <div id="gcp-status" class="capability-list">Comprobando Google Cloud…</div>
+      <div class="tools-actions" style="margin-top:12px"><button id="preview-gcp-job" class="secondary">Previsualizar Google Batch</button><button id="submit-gcp-job" class="primary">Enviar a Google Cloud</button></div>
+      <p class="tools-note">Para enviar de verdad se deben configurar proyecto, bucket, perfiles de máquina/imagen y autenticación del servidor. La NVIDIA_API_KEY no es necesaria para Google Cloud Batch.</p>
     </section>
 
     <section class="tools-card" style="margin-top:22px">

@@ -1,6 +1,6 @@
 (() => {
   const $=s=>document.querySelector(s);
-  const state={config:null,status:null,toolkit:null,workers:null};
+  const state={config:null,status:null,toolkit:null,workers:null,gcp:null,lastPreparedJob:null};
   function authSession(){try{return JSON.parse(localStorage.getItem('scibrain_supabase_session')||'null')}catch{return null}}
   function saveSession(v){if(v)localStorage.setItem('scibrain_supabase_session',JSON.stringify(v));else localStorage.removeItem('scibrain_supabase_session')}
   function token(){return authSession()?.access_token||''}
@@ -20,22 +20,28 @@
     const implemented=state.toolkit?.implemented_extensions||[];$('#implemented-extensions').innerHTML=implemented.map(x=>'<span>'+x+'</span>').join('');
     const workers=state.workers?.workers||[];$('#worker-status').innerHTML='<div class="status-row"><span>Workers/HPC</span><strong class="'+(workers.length?'status-good':'status-warn')+'">'+workers.length+'</strong></div>';
     $('#workers-list').innerHTML=workers.length?workers.map(w=>'<div class="capability-item"><strong>'+w.name+'</strong><div class="tools-note">'+(w.description||'Worker científico')+'</div><div>'+((w.solvers||[]).join(' · ')||'sin solver declarado')+'</div></div>').join(''):'<div class="status-warn">Aún no hay workers/HPC configurados.</div>';
+    const g=state.gcp||{}; const profiles=g.profiles||[];
+    $('#gcp-status').innerHTML='<div class="status-row"><span>Integración</span><strong class="'+(g.configured?'status-good':'status-warn')+'">'+(g.configured?'Lista':'Pendiente de configuración')+'</strong></div><div class="status-row"><span>Región</span><strong>'+(g.region||'—')+'</strong></div><div class="status-row"><span>Perfiles</span><strong>'+profiles.length+'</strong></div><div class="status-row"><span>Autenticación</span><strong>'+(g.auth_mode||'—')+'</strong></div>';
+    $('#submit-gcp-job').disabled=!g.configured;
   }
   async function load(){
     await loadConfig();
     if(!token()){out('Autenticación','Inicia sesión en ScientificBrain para usar las herramientas.');$('#run-nvidia-chat').disabled=true;$('#run-capability').disabled=true;return}
     const health=await api('/api/health');$('#tools-version').textContent='v'+health.version;
-    const [status,toolkit,workers]=await Promise.all([api('/api/science?op=nvidia_status'),api('/api/science?op=physics_toolkit'),api('/api/science?op=physics_workers')]);
-    state.status=status;state.toolkit=toolkit;state.workers=workers;render();
+    const [status,toolkit,workers,gcp]=await Promise.all([api('/api/science?op=nvidia_status'),api('/api/science?op=physics_toolkit'),api('/api/science?op=physics_workers'),api('/api/science?op=gcp_batch_status')]);
+    state.status=status;state.toolkit=toolkit;state.workers=workers;state.gcp=gcp;render();
   }
   function num(id){const v=$(id).value.trim();return v===''?null:Number(v)}
   async function prepareJob(){
     try{
       let parameters;try{parameters=JSON.parse($('#job-parameters').value||'{}')}catch{throw new Error('Parámetros JSON inválidos')}
       const payload={solver:$('#job-solver').value,action:$('#job-action').value,model:$('#job-model').value.trim(),input_artifact:$('#job-input').value.trim(),parameters,resources:{gpus:Number($('#job-gpus').value||0),cpus:4,nodes:1,memory_gb:8,wall_minutes:60}};
-      const r=await api('/api/science?op=physics_prepare_job',{method:'POST',body:JSON.stringify(payload)});out('Job científico preparado',r);
+      const r=await api('/api/science?op=physics_prepare_job',{method:'POST',body:JSON.stringify(payload)});state.lastPreparedJob=r;out('Job científico preparado',r);
     }catch(e){out('Error job',e.message)}
   }
+  async function ensurePreparedJob(){if(state.lastPreparedJob)return state.lastPreparedJob;await prepareJob();if(!state.lastPreparedJob)throw new Error('Primero prepara un job científico');return state.lastPreparedJob}
+  async function previewGcp(){try{const job=await ensurePreparedJob();const r=await api('/api/science?op=gcp_batch_preview',{method:'POST',body:JSON.stringify({job})});out('Google Cloud Batch preview',r)}catch(e){out('Error Google Cloud',e.message)}}
+  async function submitGcp(){try{const job=await ensurePreparedJob();const r=await api('/api/science?op=gcp_batch_submit',{method:'POST',body:JSON.stringify({job})});out('Google Cloud Batch enviado',r)}catch(e){out('Error Google Cloud',e.message)}}
   async function runRouter(){
     try{
       const payload={ne:num('#r-ne'),B:num('#r-B'),Te_ev:num('#r-Te'),Ti_ev:num('#r-Ti'),L:num('#r-L'),U:num('#r-U'),A:num('#r-A'),Z:num('#r-Z'),mfp:num('#r-mfp'),needs_electron_kinetics:$('#r-electron').checked,low_temperature_2d:$('#r-lowt').checked,particle_through_matter:$('#r-matter').checked};
@@ -50,5 +56,5 @@
   }
   async function runChat(){try{const prompt=$('#nvidia-prompt').value.trim();if(!prompt)throw new Error('Escribe una consulta');const r=await api('/api/science?op=nvidia_invoke',{method:'POST',body:JSON.stringify({capability:'nvidia-chat',input:{prompt}})});out('NVIDIA API',r)}catch(e){out('Error NVIDIA',e.message)}}
   async function runCapability(){try{const capability=$('#capability-select').value;if(!capability)throw new Error('No hay capacidad seleccionada');let input;try{input=JSON.parse($('#capability-input').value||'{}')}catch{throw new Error('Entrada JSON inválida')}const r=await api('/api/science?op=nvidia_invoke',{method:'POST',body:JSON.stringify({capability,input})});out(capability,r)}catch(e){out('Error capacidad',e.message)}}
-  window.addEventListener('DOMContentLoaded',()=>{$('#prepare-physics-job').addEventListener('click',prepareJob);$('#run-physics-router').addEventListener('click',runRouter);$('#run-monte-carlo').addEventListener('click',runMonteCarlo);$('#run-nvidia-chat').addEventListener('click',runChat);$('#run-capability').addEventListener('click',runCapability);$('#clear-tools-output').addEventListener('click',()=>$('#tools-output').textContent='ScientificBrain Physics Tools listo.');load().catch(e=>out('Inicialización',e.message))});
+  window.addEventListener('DOMContentLoaded',()=>{$('#prepare-physics-job').addEventListener('click',prepareJob);$('#preview-gcp-job').addEventListener('click',previewGcp);$('#submit-gcp-job').addEventListener('click',submitGcp);$('#run-physics-router').addEventListener('click',runRouter);$('#run-monte-carlo').addEventListener('click',runMonteCarlo);$('#run-nvidia-chat').addEventListener('click',runChat);$('#run-capability').addEventListener('click',runCapability);$('#clear-tools-output').addEventListener('click',()=>$('#tools-output').textContent='ScientificBrain Physics Tools listo.');load().catch(e=>out('Inicialización',e.message))});
 })();

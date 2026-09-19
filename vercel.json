@@ -42,6 +42,10 @@
   },
   "rewrites": [
     {
+      "source": "/scientific-capabilities",
+      "destination": "/scientific-capabilities.html"
+    },
+    {
       "source": "/scientific-tools",
       "destination": "/scientific-tools.html"
     },

@@ -8,6 +8,7 @@ from scientific_brain.auth import require_user
 from scientific_brain.collaboration import CollaborativeResearchService
 from scientific_brain.graph_service import ScientificGraphService
 from scientific_brain.graph_store import ScientificGraphStore
+from scientific_brain.google_batch import google_batch_from_env
 from scientific_brain.nvidia_provider import nvidia_provider_from_env, physics_toolkit_manifest
 from scientific_brain.persistence import hydrate_memory_from_snapshot
 from scientific_brain.physics_jobs import physics_execution_profiles, prepare_physics_job
@@ -78,6 +79,15 @@ class handler(BaseHTTPRequestHandler):
             if op == "physics_profiles":
                 self._write(200, physics_execution_profiles())
                 return
+            if op == "gcp_batch_status":
+                self._write(200, google_batch_from_env().status())
+                return
+            if op == "gcp_batch_get":
+                job_id = str((query.get("job_id") or [""])[0]).strip()
+                if not job_id:
+                    raise ValueError("job_id is required")
+                self._write(200, google_batch_from_env().get(job_id))
+                return
             folder_id = (query.get("folder_id") or [""])[0]
             if not folder_id:
                 raise ValueError("folder_id is required")
@@ -118,6 +128,24 @@ class handler(BaseHTTPRequestHandler):
         op = self._op()
         try:
             payload = self._body()
+            if op == "gcp_batch_preview":
+                job = payload.get("job") or {}
+                if not isinstance(job, dict):
+                    raise ValueError("job must be a JSON object")
+                self._write(200, google_batch_from_env().build_job(job))
+                return
+            if op == "gcp_batch_submit":
+                job = payload.get("job") or {}
+                if not isinstance(job, dict):
+                    raise ValueError("job must be a JSON object")
+                self._write(202, google_batch_from_env().submit(job))
+                return
+            if op == "gcp_batch_delete":
+                job_id = str(payload.get("job_id") or "").strip()
+                if not job_id:
+                    raise ValueError("job_id is required")
+                self._write(202, google_batch_from_env().delete(job_id))
+                return
             if op == "physics_prepare_job":
                 self._write(200, prepare_physics_job(payload))
                 return
