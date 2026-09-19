@@ -435,6 +435,23 @@ prepare job
 → diagnostics / validation / UQ / multi-fidelity / PhysicsNeMo
 ```
 
+## Google Cloud bootstrap and private FLASH — v0.28
+
+ScientificBrain now includes an idempotent Google Cloud bootstrap under `infra/gcp/`. It creates the private artifact bucket, a private Artifact Registry Docker repository and a dedicated Batch job service account, then grants the runtime roles needed for Batch state reporting, Cloud Logging, Cloud Storage objects and private image pulls.
+
+The four primary production variables are:
+
+```text
+SCIBRAIN_GCP_PROJECT_ID
+SCIBRAIN_GCP_ARTIFACT_BUCKET
+SCIBRAIN_GCP_JOB_SERVICE_ACCOUNT
+SCIBRAIN_GCP_BATCH_PROFILES_JSON
+```
+
+FLASH is supported as a Google Cloud Batch solver. Its image must be built privately from an authorized FLASH checkout and must never be published through this repository.
+
+See `docs/GOOGLE_CLOUD_BOOTSTRAP.md`.
+
 ## Development
 
 ```bash
