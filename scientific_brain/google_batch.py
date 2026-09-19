@@ -15,6 +15,7 @@ from google.oauth2 import service_account
 import httpx
 
 from .physics_jobs import PhysicsJob
+from .google_wif import vercel_wif_from_env
 
 
 BATCH_SCOPE = "https://www.googleapis.com/auth/cloud-platform"
@@ -121,6 +122,11 @@ class GoogleCloudBatch:
         )
 
     def auth_mode(self) -> str:
+        wif = vercel_wif_from_env()
+        if wif.available:
+            return "vercel_oidc_wif"
+        if wif.configured:
+            return "vercel_oidc_wif_pending_token"
         if os.getenv("SCIBRAIN_GCP_SERVICE_ACCOUNT_JSON", "").strip():
             return "service_account_json"
         if os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "").strip():
@@ -137,6 +143,7 @@ class GoogleCloudBatch:
             "artifact_bucket_configured": bool(self.artifact_bucket),
             "job_service_account_configured": bool(self.job_service_account),
             "auth_mode": self.auth_mode(),
+            "workload_identity": vercel_wif_from_env().public_status(),
             "profiles": [profile.public_dict() for profile in self.profiles.values()],
             "notes": [
                 "Google Cloud Batch provisions Compute Engine resources for submitted jobs.",
@@ -146,6 +153,10 @@ class GoogleCloudBatch:
         }
 
     def _credentials(self):
+        wif = vercel_wif_from_env()
+        if wif.available:
+            return wif.credentials()
+
         raw = os.getenv("SCIBRAIN_GCP_SERVICE_ACCOUNT_JSON", "").strip()
         if raw:
             info = json.loads(raw)
