@@ -3,48 +3,144 @@
   "cleanUrls": true,
   "fluid": true,
   "functions": {
-    "api/meta.py": { "maxDuration": 30 },
-    "api/workspace.py": { "maxDuration": 60 },
-    "api/jobs.py": { "maxDuration": 30 },
-    "api/search.py": { "maxDuration": 180 },
-    "api/run_job.py": { "maxDuration": 300 },
-    "api/paper.py": { "maxDuration": 300 },
-    "api/research.py": { "maxDuration": 300 },
-    "api/science.py": { "maxDuration": 300 },
-    "api/orchestrate.py": { "maxDuration": 300 },
-    "api/collaboration.py": { "maxDuration": 300 },
-    "api/corpus.py": { "maxDuration": 300 },
-    "api/watch_cron.py": { "maxDuration": 300 }
+    "api/meta.py": {
+      "maxDuration": 30
+    },
+    "api/workspace.py": {
+      "maxDuration": 60
+    },
+    "api/jobs.py": {
+      "maxDuration": 30
+    },
+    "api/search.py": {
+      "maxDuration": 180
+    },
+    "api/run_job.py": {
+      "maxDuration": 300
+    },
+    "api/paper.py": {
+      "maxDuration": 300
+    },
+    "api/research.py": {
+      "maxDuration": 300
+    },
+    "api/science.py": {
+      "maxDuration": 300
+    },
+    "api/orchestrate.py": {
+      "maxDuration": 300
+    },
+    "api/collaboration.py": {
+      "maxDuration": 300
+    },
+    "api/corpus.py": {
+      "maxDuration": 300
+    },
+    "api/watch_cron.py": {
+      "maxDuration": 300
+    }
   },
   "rewrites": [
-    { "source": "/api/health", "destination": "/api/meta?op=health" },
-    { "source": "/api/manifest", "destination": "/api/meta?op=manifest" },
-    { "source": "/api/client_config", "destination": "/api/meta?op=client_config" },
-    { "source": "/api/project_schema", "destination": "/api/meta?op=project_schema" },
-    { "source": "/api/project_template", "destination": "/api/meta?op=project_template" },
-    { "source": "/api/validate_project", "destination": "/api/meta?op=validate_project" },
-    { "source": "/api/consent", "destination": "/api/workspace?op=consent" },
-    { "source": "/api/sync_context", "destination": "/api/workspace?op=sync_context" },
-    { "source": "/api/attach_pdf", "destination": "/api/workspace?op=attach_pdf" },
-    { "source": "/api/folders", "destination": "/api/workspace?op=folders" },
-    { "source": "/api/library", "destination": "/api/workspace?op=library" },
-    { "source": "/api/projects", "destination": "/api/workspace?op=projects" },
-    { "source": "/api/session", "destination": "/api/workspace?op=session" },
-    { "source": "/api/research_search", "destination": "/api/search" },
-    { "source": "/api/run_agent", "destination": "/api/science?op=run_agent" },
-    { "source": "/api/validate_stage", "destination": "/api/science?op=validate_stage" },
-    { "source": "/api/artifact", "destination": "/api/science?op=artifact" }
+    {
+      "source": "/scientific-tools",
+      "destination": "/scientific-tools.html"
+    },
+    {
+      "source": "/api/health",
+      "destination": "/api/meta?op=health"
+    },
+    {
+      "source": "/api/manifest",
+      "destination": "/api/meta?op=manifest"
+    },
+    {
+      "source": "/api/client_config",
+      "destination": "/api/meta?op=client_config"
+    },
+    {
+      "source": "/api/project_schema",
+      "destination": "/api/meta?op=project_schema"
+    },
+    {
+      "source": "/api/project_template",
+      "destination": "/api/meta?op=project_template"
+    },
+    {
+      "source": "/api/validate_project",
+      "destination": "/api/meta?op=validate_project"
+    },
+    {
+      "source": "/api/consent",
+      "destination": "/api/workspace?op=consent"
+    },
+    {
+      "source": "/api/sync_context",
+      "destination": "/api/workspace?op=sync_context"
+    },
+    {
+      "source": "/api/attach_pdf",
+      "destination": "/api/workspace?op=attach_pdf"
+    },
+    {
+      "source": "/api/folders",
+      "destination": "/api/workspace?op=folders"
+    },
+    {
+      "source": "/api/library",
+      "destination": "/api/workspace?op=library"
+    },
+    {
+      "source": "/api/projects",
+      "destination": "/api/workspace?op=projects"
+    },
+    {
+      "source": "/api/session",
+      "destination": "/api/workspace?op=session"
+    },
+    {
+      "source": "/api/research_search",
+      "destination": "/api/search"
+    },
+    {
+      "source": "/api/run_agent",
+      "destination": "/api/science?op=run_agent"
+    },
+    {
+      "source": "/api/validate_stage",
+      "destination": "/api/science?op=validate_stage"
+    },
+    {
+      "source": "/api/artifact",
+      "destination": "/api/science?op=artifact"
+    }
   ],
   "crons": [
-    { "path": "/api/watch_cron", "schedule": "0 12 * * *" }
+    {
+      "path": "/api/watch_cron",
+      "schedule": "0 12 * * *"
+    }
   ],
-  "headers": [{
-    "source": "/api/(.*)",
-    "headers": [
-      { "key": "X-Content-Type-Options", "value": "nosniff" },
-      { "key": "X-Frame-Options", "value": "DENY" },
-      { "key": "Referrer-Policy", "value": "no-referrer" },
-      { "key": "Cache-Control", "value": "no-store" }
-    ]
-  }]
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "no-referrer"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    }
+  ]
 }

@@ -11,6 +11,7 @@ def _clear_provider_env(monkeypatch):
         "GEMINI_API_KEY",
         "GEMINI_API_KEY_TEXT",
         "GROQ_API_KEY",
+        "NVIDIA_API_KEY",
         "OPENROUTER_API_KEY",
         "OPENROUTER_API_KEY_1",
         "OPENROUTER_API_KEY_2",

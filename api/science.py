@@ -8,6 +8,7 @@ from scientific_brain.auth import require_user
 from scientific_brain.collaboration import CollaborativeResearchService
 from scientific_brain.graph_service import ScientificGraphService
 from scientific_brain.graph_store import ScientificGraphStore
+from scientific_brain.nvidia_provider import nvidia_provider_from_env, physics_toolkit_manifest
 from scientific_brain.persistence import hydrate_memory_from_snapshot
 from scientific_brain.providers import provider_from_env
 from scientific_brain.stage_stepper import StageStepper
@@ -58,6 +59,12 @@ class handler(BaseHTTPRequestHandler):
         op = self._op()
         query = self._query()
         try:
+            if op == "nvidia_status":
+                self._write(200, nvidia_provider_from_env().status())
+                return
+            if op == "physics_toolkit":
+                self._write(200, physics_toolkit_manifest())
+                return
             folder_id = (query.get("folder_id") or [""])[0]
             if not folder_id:
                 raise ValueError("folder_id is required")
@@ -98,6 +105,15 @@ class handler(BaseHTTPRequestHandler):
         op = self._op()
         try:
             payload = self._body()
+            if op == "nvidia_invoke":
+                capability = str(payload.get("capability") or "").strip()
+                if not capability:
+                    raise ValueError("capability is required")
+                tool_input = payload.get("input") or {}
+                if not isinstance(tool_input, dict):
+                    raise ValueError("input must be a JSON object")
+                self._write(200, nvidia_provider_from_env().invoke(capability, tool_input))
+                return
             if op in {"generate_draft", "save_section", "save_topic", "discuss", "review_section"}:
                 folder_id = str(payload.get("folder_id") or "").strip()
                 if not folder_id:
