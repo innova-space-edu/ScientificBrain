@@ -19,13 +19,13 @@ class InferenceTask(StrEnum):
 
 
 DEFAULT_PROVIDER_ORDERS = {
-    InferenceTask.TEXT.value: "google,vertex-model-cloud,groq,openrouter,cerebras,together",
-    InferenceTask.STRUCTURED.value: "google,vertex-model-cloud,groq,openrouter,cerebras,together",
-    InferenceTask.LONG_CONTEXT.value: "google,vertex-model-cloud,openrouter,groq,cerebras,together",
-    InferenceTask.RESEARCH.value: "google,groq,openrouter",
+    InferenceTask.TEXT.value: "google,nvidia,vertex-model-cloud,groq,openrouter,cerebras,together",
+    InferenceTask.STRUCTURED.value: "google,nvidia,vertex-model-cloud,groq,openrouter,cerebras,together",
+    InferenceTask.LONG_CONTEXT.value: "google,nvidia,vertex-model-cloud,openrouter,groq,cerebras,together",
+    InferenceTask.RESEARCH.value: "google,nvidia,groq,openrouter",
     InferenceTask.RETRIEVAL.value: "google",
-    InferenceTask.CODE.value: "google,vertex-model-cloud,groq,cerebras,openrouter,together",
-    InferenceTask.FAST.value: "google,groq,openrouter,cerebras,together",
+    InferenceTask.CODE.value: "google,nvidia,vertex-model-cloud,groq,cerebras,openrouter,together",
+    InferenceTask.FAST.value: "google,nvidia,groq,openrouter,cerebras,together",
 }
 
 ORDER_ENV = {
@@ -242,6 +242,20 @@ def _google_provider(task: str) -> GeminiProvider | None:
     )
 
 
+def _nvidia_provider(task: str) -> OpenAICompatibleProvider | None:
+    key = _first_env("NVIDIA_API_KEY")
+    if not key:
+        return None
+    model = _first_env("SCIBRAIN_NVIDIA_TEXT_MODEL") or "openai/gpt-oss-20b"
+    return OpenAICompatibleProvider(
+        model=model,
+        base_url=os.getenv("SCIBRAIN_NVIDIA_API_BASE", "https://integrate.api.nvidia.com/v1"),
+        api_key=key,
+        timeout=_timeout_seconds(),
+        provider_name="nvidia",
+    )
+
+
 def _groq_provider(task: str) -> OpenAICompatibleProvider | None:
     key = _first_env("GROQ_API_KEY")
     if not key:
@@ -335,6 +349,10 @@ def build_cloud_router(task: str = InferenceTask.RESEARCH.value) -> RoutedProvid
             provider = _google_provider(task)
             if provider:
                 providers.append(provider)
+        elif name == "nvidia":
+            provider = _nvidia_provider(task)
+            if provider:
+                providers.append(provider)
         elif name == "groq":
             provider = _groq_provider(task)
             if provider:
@@ -370,6 +388,9 @@ def provider_configuration_summary(task: str | None = None) -> dict[str, Any]:
         "configured_providers": router.configured_provider_names,
         "local_fallback_enabled": _truthy("SCIBRAIN_ENABLE_LOCAL_FALLBACK", False),
         "vertex_model_cloud_enabled": _truthy("VERTEX_MODEL_CLOUD_ENABLED", False),
+        "nvidia_scientific_tools_configured": bool(
+            _first_env("NVIDIA_API_KEY", "NGC_API_KEY", "SCIBRAIN_NVIDIA_NIM_BASE_URL")
+        ),
     }
 
 
@@ -379,6 +400,11 @@ def provider_from_env(kind: str | None = None, task: str | None = None):
 
     if selected in {"cloud", "online", "eduai", "router"}:
         return build_cloud_router(selected_task)
+    if selected == "nvidia":
+        provider = _nvidia_provider(selected_task)
+        if provider is None:
+            raise RuntimeError("NVIDIA_API_KEY is required for NVIDIA inference")
+        return provider
     if selected in {"ollama", "local"}:
         return OllamaProvider()
     if selected in {"openai-compatible", "openai_compatible"}:

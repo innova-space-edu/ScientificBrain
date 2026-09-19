@@ -316,6 +316,34 @@ To avoid excessive Python Functions, the deployment uses four physical gateways:
 
 Public route names are preserved through `vercel.json` rewrites.
 
+
+## Scientific Tools and NVIDIA provider — v0.23
+
+ScientificBrain now separates scientific capabilities from the general inference router.
+
+The dedicated workspace is available at:
+
+```text
+/scientific-tools
+```
+
+The Scientific Tools page centralizes:
+
+- NVIDIA hosted API/NIM status;
+- ScientificBrain Physics Skills;
+- FLASH high-fidelity solver integration;
+- NVIDIA PhysicsNeMo;
+- NVIDIA BioNeMo/custom scientific NIM capabilities;
+- FLASH → HDF5/yt → PhysicsNeMo → 2D/3D surrogate → physical validation.
+
+Credentials remain server-side. `NVIDIA_API_KEY` is used for hosted NVIDIA API Catalog inference; `NGC_API_KEY` is kept separate for NGC/NIM container/model access when required. Custom scientific endpoints are registered by the server through `SCIBRAIN_NVIDIA_CAPABILITIES_JSON`; the browser cannot supply arbitrary endpoint URLs.
+
+Physics skills live in the separate repository:
+
+https://github.com/innova-space-edu/scientificbrain-physics-skills
+
+Planned extensions preserved in the toolkit roadmap are **PIC/hybrid routing, additional diagnostics, distributed simulation/training, active learning, and direct ScientificBrain orchestration**.
+
 ## Development
 
 ```bash

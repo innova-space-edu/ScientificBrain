@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Herramientas científicas · ScientificBrain</title>
+  <link rel="stylesheet" href="/assets/styles.css"/>
+  <link rel="stylesheet" href="/assets/scientific_tools.css"/>
+</head>
+<body class="tools-shell">
+  <header class="tools-top">
+    <div class="tools-brand"><div class="mark">SB</div><div><strong>ScientificBrain</strong><div class="muted">Herramientas científicas</div></div></div>
+    <div class="tools-actions"><span id="tools-version" class="badge">v—</span><a class="ghost tools-link" href="/">← Volver a ScientificBrain</a></div>
+  </header>
+  <main class="tools-main">
+    <section class="tools-hero">
+      <article class="tools-card">
+        <p class="eyebrow">Scientific compute workspace</p>
+        <h1>Herramientas científicas</h1>
+        <p>Espacio independiente para ejecutar y conectar herramientas especializadas sin mezclar sus credenciales con las skills. ScientificBrain controla autenticación, proveedor, trazabilidad y resultados.</p>
+        <div class="future-list" id="future-extensions"></div>
+      </article>
+      <article class="tools-card">
+        <h3>Estado de NVIDIA</h3>
+        <div id="nvidia-status">Comprobando configuración…</div>
+      </article>
+    </section>
+
+    <section class="tool-grid" id="tool-grid">
+      <article class="tool-card"><span class="tag">Physics</span><h3>Physics Skills</h3><p>15 skills de plasma/FLASH/PhysicsNeMo y validación 2D/3D.</p><a class="secondary tools-link" href="https://github.com/innova-space-edu/scientificbrain-physics-skills" target="_blank" rel="noopener">Abrir repositorio ↗</a></article>
+      <article class="tool-card"><span class="tag">Solver</span><h3>FLASH</h3><p>Solver de alta fidelidad para MHD, resistiva y Extended-MHD. Se ejecuta en infraestructura con FLASH instalado.</p><div id="flash-state" class="status-warn">Conector remoto/local por configurar</div></article>
+      <article class="tool-card"><span class="tag">SciML</span><h3>NVIDIA PhysicsNeMo</h3><p>Surrogates, neural operators, PINO y aprendizaje científico para datasets provenientes de FLASH.</p><div id="physicsnemo-state" class="status-warn">Capacidad por configurar</div></article>
+      <article class="tool-card"><span class="tag">Life sciences</span><h3>NVIDIA BioNeMo</h3><p>Acceso centralizado a NIMs/capacidades de biología molecular, proteínas, química y genómica.</p><div id="bionemo-state" class="status-warn">Capacidad por configurar</div></article>
+      <article class="tool-card"><span class="tag">NVIDIA API</span><h3>NVIDIA NIM / API Catalog</h3><p>Inferencia alojada compatible con OpenAI y endpoints científicos registrados en ScientificBrain.</p><div id="api-state" class="status-warn">API no comprobada</div></article>
+      <article class="tool-card"><span class="tag">Pipeline</span><h3>FLASH → PhysicsNeMo</h3><p>Regime → simulación → HDF5/yt → dataset → surrogate 2D/3D → validación física.</p><div class="status-good">Definido por Physics Skills</div></article>
+    </section>
+
+    <section class="tools-hero" style="margin-top:22px">
+      <article class="tools-card">
+        <h2>Probar NVIDIA API</h2>
+        <div class="tools-form">
+          <label>Consulta científica<textarea id="nvidia-prompt">Explica en tres puntos qué información física necesito antes de decidir si un shock magnetizado requiere Hall-MHD.</textarea></label>
+          <button id="run-nvidia-chat" class="primary">Ejecutar NVIDIA</button>
+          <p class="tools-note">La clave NVIDIA nunca se envía al navegador. La llamada sale desde el backend de ScientificBrain.</p>
+        </div>
+      </article>
+      <article class="tools-card">
+        <h2>Capacidad científica configurada</h2>
+        <div class="tools-form">
+          <label>Capacidad<select id="capability-select"><option value="">Sin capacidades configuradas</option></select></label>
+          <label>Entrada JSON<textarea id="capability-input">{}</textarea></label>
+          <button id="run-capability" class="secondary">Ejecutar capacidad</button>
+        </div>
+      </article>
+    </section>
+
+    <section class="tools-card" style="margin-top:22px">
+      <div class="card-head"><h2>Salida</h2><button id="clear-tools-output" class="ghost">Limpiar</button></div>
+      <pre id="tools-output" class="tools-output">ScientificBrain Tools listo.</pre>
+    </section>
+  </main>
+  <script src="/assets/scientific_tools.js"></script>
+</body>
+</html>
