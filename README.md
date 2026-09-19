@@ -452,6 +452,16 @@ FLASH is supported as a Google Cloud Batch solver. Its image must be built priva
 
 See `docs/GOOGLE_CLOUD_BOOTSTRAP.md`.
 
+## Vercel OIDC → Google Workload Identity Federation — v0.29
+
+Production Google authentication now uses the Vercel-issued `VERCEL_OIDC_TOKEN` and the verified provider `projects/260133939682/locations/global/workloadIdentityPools/vercel/providers/scientificbrain`.
+
+ScientificBrain exchanges that OIDC token through Google Security Token Service and then impersonates `scibrain-vercel-dispatcher@scientificbrain-compute.iam.gserviceaccount.com` through IAM Credentials. The resulting OAuth token is short-lived and cached only in process memory.
+
+An authenticated `gcp_auth_probe` operation verifies the complete Vercel → STS → service-account impersonation flow without returning credentials.
+
+See `docs/VERCEL_GCP_WIF.md`.
+
 ## Development
 
 ```bash
