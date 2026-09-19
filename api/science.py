@@ -9,6 +9,7 @@ from scientific_brain.collaboration import CollaborativeResearchService
 from scientific_brain.graph_service import ScientificGraphService
 from scientific_brain.graph_store import ScientificGraphStore
 from scientific_brain.google_batch import google_batch_from_env
+from scientific_brain.google_setup import google_cloud_setup_plan
 from scientific_brain.nvidia_provider import nvidia_provider_from_env, physics_toolkit_manifest
 from scientific_brain.persistence import hydrate_memory_from_snapshot
 from scientific_brain.physics_jobs import physics_execution_profiles, prepare_physics_job
@@ -81,6 +82,9 @@ class handler(BaseHTTPRequestHandler):
                 return
             if op == "gcp_batch_status":
                 self._write(200, google_batch_from_env().status())
+                return
+            if op == "gcp_setup_plan":
+                self._write(200, google_cloud_setup_plan())
                 return
             if op == "gcp_batch_get":
                 job_id = str((query.get("job_id") or [""])[0]).strip()
