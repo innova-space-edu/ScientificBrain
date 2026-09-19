@@ -61,7 +61,8 @@
       <div class="card-head"><div><p class="eyebrow">Google Cloud setup</p><h2>Configuración requerida</h2></div></div>
       <p>ScientificBrain usa cuatro valores principales para activar Google Cloud. El bootstrap del repositorio crea el bucket privado, Artifact Registry y la cuenta de servicio de los jobs.</p>
       <div id="gcp-setup-plan" class="capability-list">Comprobando variables…</div>
-      <p class="tools-note">FLASH también puede ejecutarse en Google Cloud. Su imagen debe permanecer privada y construirse desde una copia autorizada.</p>
+      <div class="tools-actions" style="margin-top:12px"><button id="test-gcp-auth" class="secondary">Probar Vercel → Google WIF</button></div>
+      <p class="tools-note">La prueba usa credenciales temporales y no muestra tokens. FLASH también puede ejecutarse en Google Cloud mediante una imagen privada.</p>
     </section>
 
     <section class="tools-card" style="margin-top:22px">
