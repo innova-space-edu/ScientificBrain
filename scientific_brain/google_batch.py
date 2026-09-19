@@ -6,6 +6,7 @@ import math
 import os
 import re
 from dataclasses import dataclass
+from urllib.parse import quote
 from typing import Any
 
 import google.auth
@@ -18,7 +19,9 @@ from .physics_jobs import PhysicsJob
 
 BATCH_SCOPE = "https://www.googleapis.com/auth/cloud-platform"
 BATCH_API_ROOT = "https://batch.googleapis.com/v1"
+STORAGE_API_ROOT = "https://storage.googleapis.com/storage/v1"
 _JOB_ID_RE = re.compile(r"^[a-z][a-z0-9-]{0,62}$")
+_SCIENTIFIC_JOB_ID_RE = re.compile(r"^[0-9a-fA-F-]{8,64}$")
 
 
 def _truthy(name: str, default: bool = False) -> bool:
@@ -348,6 +351,71 @@ class GoogleCloudBatch:
         response = httpx.delete(url, headers=self._headers(), timeout=self.timeout)
         response.raise_for_status()
         return {"provider": "google_cloud_batch", "job_id": job_id, "delete_requested": True}
+
+    def _scientific_output_prefix(self, scientific_job_id: str) -> tuple[str, str]:
+        if not self.artifact_bucket:
+            raise RuntimeError("SCIBRAIN_GCP_ARTIFACT_BUCKET is not configured")
+        if not _SCIENTIFIC_JOB_ID_RE.fullmatch(scientific_job_id):
+            raise ValueError("Invalid ScientificBrain job_id")
+        bucket = self.artifact_bucket.removeprefix("gs://").rstrip("/")
+        prefix = f"scientificbrain/jobs/{scientific_job_id}/"
+        return bucket, prefix
+
+    def list_outputs(self, scientific_job_id: str) -> dict[str, Any]:
+        bucket, prefix = self._scientific_output_prefix(scientific_job_id)
+        url = f"{STORAGE_API_ROOT}/b/{quote(bucket, safe='')}/o"
+        response = httpx.get(
+            url,
+            params={"prefix": prefix},
+            headers=self._headers(),
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        items = []
+        for item in payload.get("items") or []:
+            name = str(item.get("name") or "")
+            if not name.startswith(prefix):
+                continue
+            items.append({
+                "name": name,
+                "relative_name": name[len(prefix):],
+                "size": item.get("size"),
+                "content_type": item.get("contentType"),
+                "updated": item.get("updated"),
+                "generation": item.get("generation"),
+            })
+        return {
+            "provider": "google_cloud_storage",
+            "scientific_job_id": scientific_job_id,
+            "prefix": f"gs://{bucket}/{prefix}",
+            "count": len(items),
+            "items": items,
+        }
+
+    def output_manifest(self, scientific_job_id: str) -> dict[str, Any]:
+        bucket, prefix = self._scientific_output_prefix(scientific_job_id)
+        object_name = prefix + "scientificbrain-output.json"
+        url = (
+            f"{STORAGE_API_ROOT}/b/{quote(bucket, safe='')}/o/"
+            f"{quote(object_name, safe='')}"
+        )
+        response = httpx.get(
+            url,
+            params={"alt": "media"},
+            headers=self._headers(),
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        if not isinstance(payload, dict):
+            raise ValueError("scientificbrain-output.json must contain a JSON object")
+        return {
+            "provider": "google_cloud_storage",
+            "scientific_job_id": scientific_job_id,
+            "object": f"gs://{bucket}/{object_name}",
+            "manifest": payload,
+        }
 
 
 def google_batch_from_env() -> GoogleCloudBatch:
