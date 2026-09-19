@@ -1,6 +1,6 @@
 (() => {
   const $=s=>document.querySelector(s);
-  const state={config:null,status:null,toolkit:null,workers:null,gcp:null,lastPreparedJob:null};
+  const state={config:null,status:null,toolkit:null,workers:null,gcp:null,gcpSetup:null,lastPreparedJob:null};
   function authSession(){try{return JSON.parse(localStorage.getItem('scibrain_supabase_session')||'null')}catch{return null}}
   function saveSession(v){if(v)localStorage.setItem('scibrain_supabase_session',JSON.stringify(v));else localStorage.removeItem('scibrain_supabase_session')}
   function token(){return authSession()?.access_token||''}
@@ -20,6 +20,8 @@
     const implemented=state.toolkit?.implemented_extensions||[];$('#implemented-extensions').innerHTML=implemented.map(x=>'<span>'+x+'</span>').join('');
     const workers=state.workers?.workers||[];$('#worker-status').innerHTML='<div class="status-row"><span>Workers/HPC</span><strong class="'+(workers.length?'status-good':'status-warn')+'">'+workers.length+'</strong></div>';
     $('#workers-list').innerHTML=workers.length?workers.map(w=>'<div class="capability-item"><strong>'+w.name+'</strong><div class="tools-note">'+(w.description||'Worker científico')+'</div><div>'+((w.solvers||[]).join(' · ')||'sin solver declarado')+'</div></div>').join(''):'<div class="status-warn">Aún no hay workers/HPC configurados.</div>';
+    const setup=state.gcpSetup||{};const setupVars=setup.variables||[];
+    $('#gcp-setup-plan').innerHTML=setupVars.map(v=>'<div class="status-row"><span>'+v.name+'</span><strong class="'+(v.configured?'status-good':'status-warn')+'">'+(v.configured?'Configurado':'Pendiente')+'</strong></div>').join('')+'<div class="status-row"><span>FLASH privado en Google</span><strong class="status-good">Soportado</strong></div>';
     const g=state.gcp||{}; const profiles=g.profiles||[];
     $('#gcp-status').innerHTML='<div class="status-row"><span>Integración</span><strong class="'+(g.configured?'status-good':'status-warn')+'">'+(g.configured?'Lista':'Pendiente de configuración')+'</strong></div><div class="status-row"><span>Región</span><strong>'+(g.region||'—')+'</strong></div><div class="status-row"><span>Perfiles</span><strong>'+profiles.length+'</strong></div><div class="status-row"><span>Autenticación</span><strong>'+(g.auth_mode||'—')+'</strong></div>';
     $('#submit-gcp-job').disabled=!g.configured;
@@ -28,8 +30,8 @@
     await loadConfig();
     if(!token()){out('Autenticación','Inicia sesión en ScientificBrain para usar las herramientas.');$('#run-nvidia-chat').disabled=true;$('#run-capability').disabled=true;return}
     const health=await api('/api/health');$('#tools-version').textContent='v'+health.version;
-    const [status,toolkit,workers,gcp]=await Promise.all([api('/api/science?op=nvidia_status'),api('/api/science?op=physics_toolkit'),api('/api/science?op=physics_workers'),api('/api/science?op=gcp_batch_status')]);
-    state.status=status;state.toolkit=toolkit;state.workers=workers;state.gcp=gcp;render();
+    const [status,toolkit,workers,gcp,gcpSetup]=await Promise.all([api('/api/science?op=nvidia_status'),api('/api/science?op=physics_toolkit'),api('/api/science?op=physics_workers'),api('/api/science?op=gcp_batch_status'),api('/api/science?op=gcp_setup_plan')]);
+    state.status=status;state.toolkit=toolkit;state.workers=workers;state.gcp=gcp;state.gcpSetup=gcpSetup;render();
   }
   function num(id){const v=$(id).value.trim();return v===''?null:Number(v)}
   async function prepareJob(){
