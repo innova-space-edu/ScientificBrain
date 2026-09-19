@@ -16,36 +16,82 @@
     <section class="tools-hero">
       <article class="tools-card">
         <p class="eyebrow">Scientific compute workspace</p>
-        <h1>Herramientas científicas</h1>
-        <p>Espacio independiente para ejecutar y conectar herramientas especializadas sin mezclar sus credenciales con las skills. ScientificBrain controla autenticación, proveedor, trazabilidad y resultados.</p>
-        <div class="future-list" id="future-extensions"></div>
+        <h1>Física, simulación y SciML</h1>
+        <p>Router de modelo físico, Monte Carlo, solvers de plasma, transporte de partículas, openPMD, PhysicsNeMo y workers/HPC. Las skills están basadas en código fuente inspeccionado y ScientificBrain mantiene las credenciales fuera del navegador.</p>
+        <div class="future-list" id="implemented-extensions"></div>
       </article>
       <article class="tools-card">
-        <h3>Estado de NVIDIA</h3>
-        <div id="nvidia-status">Comprobando configuración…</div>
+        <h3>Estado de ejecución</h3>
+        <div id="nvidia-status">Comprobando NVIDIA…</div>
+        <div id="worker-status" style="margin-top:12px"></div>
       </article>
     </section>
 
-    <section class="tool-grid" id="tool-grid">
-      <article class="tool-card"><span class="tag">Physics</span><h3>Physics Skills</h3><p>15 skills de plasma/FLASH/PhysicsNeMo y validación 2D/3D.</p><a class="secondary tools-link" href="https://github.com/innova-space-edu/scientificbrain-physics-skills" target="_blank" rel="noopener">Abrir repositorio ↗</a></article>
-      <article class="tool-card"><span class="tag">Solver</span><h3>FLASH</h3><p>Solver de alta fidelidad para MHD, resistiva y Extended-MHD. Se ejecuta en infraestructura con FLASH instalado.</p><div id="flash-state" class="status-warn">Conector remoto/local por configurar</div></article>
-      <article class="tool-card"><span class="tag">SciML</span><h3>NVIDIA PhysicsNeMo</h3><p>Surrogates, neural operators, PINO y aprendizaje científico para datasets provenientes de FLASH.</p><div id="physicsnemo-state" class="status-warn">Capacidad por configurar</div></article>
-      <article class="tool-card"><span class="tag">Life sciences</span><h3>NVIDIA BioNeMo</h3><p>Acceso centralizado a NIMs/capacidades de biología molecular, proteínas, química y genómica.</p><div id="bionemo-state" class="status-warn">Capacidad por configurar</div></article>
-      <article class="tool-card"><span class="tag">NVIDIA API</span><h3>NVIDIA NIM / API Catalog</h3><p>Inferencia alojada compatible con OpenAI y endpoints científicos registrados en ScientificBrain.</p><div id="api-state" class="status-warn">API no comprobada</div></article>
-      <article class="tool-card"><span class="tag">Pipeline</span><h3>FLASH → PhysicsNeMo</h3><p>Regime → simulación → HDF5/yt → dataset → surrogate 2D/3D → validación física.</p><div class="status-good">Definido por Physics Skills</div></article>
+    <section class="tool-grid">
+      <article class="tool-card ready"><span class="tag">39 skills</span><h3>Physics Skills</h3><p>Plasma, FLASH, PIC/hybrid, Monte Carlo, UQ, diagnostics, multi-fidelity y active learning.</p><a class="secondary tools-link" href="https://github.com/innova-space-edu/scientificbrain-physics-skills" target="_blank" rel="noopener">Abrir repositorio ↗</a></article>
+      <article class="tool-card"><span class="tag">Fluid</span><h3>FLASH</h3><p>Ideal/resistive/Hall/Extended-MHD, HDF5/yt y validación.</p><div class="status-warn">Requiere worker con FLASH instalado</div></article>
+      <article class="tool-card"><span class="tag">Hybrid + PIC</span><h3>WarpX</h3><p>Hybrid-PIC, full PIC, MCC/DSMC y openPMD.</p><div class="status-warn">Requiere worker CPU/GPU</div></article>
+      <article class="tool-card"><span class="tag">HPC PIC</span><h3>PIConGPU</h3><p>PIC a gran escala, plugins de validación, colisiones y openPMD.</p><div class="status-warn">Requiere worker GPU/HPC</div></article>
+      <article class="tool-card"><span class="tag">Low-T 2D</span><h3>EDIPIC-2D</h3><p>MPI + PETSc + HYPRE para plasma de baja temperatura 2D.</p><div class="status-warn">Requiere worker MPI</div></article>
+      <article class="tool-card"><span class="tag">Monte Carlo</span><h3>Geant4</h3><p>Transporte de partículas en materia, blindaje, detectores y radiación espacial.</p><div class="status-warn">Requiere worker Geant4</div></article>
+      <article class="tool-card ready"><span class="tag">Local</span><h3>Monte Carlo / UQ</h3><p>Muestreo reproducible de parámetros y propagación de incertidumbre básica desde ScientificBrain.</p><div class="status-good">Disponible sin NVIDIA</div></article>
+      <article class="tool-card"><span class="tag">Data</span><h3>openPMD</h3><p>Capa canónica para campos y partículas de WarpX/PIConGPU; HDF5 y ADIOS2/streaming según backend.</p><div class="status-good">Contrato implementado</div></article>
+      <article class="tool-card"><span class="tag">SciML</span><h3>PhysicsNeMo</h3><p>MHD PINO/FNO, distributed training, UQ y active learning.</p><div id="physicsnemo-state" class="status-warn">Endpoint/runtime por configurar</div></article>
+      <article class="tool-card"><span class="tag">Life sciences</span><h3>BioNeMo</h3><p>Capacidades NVIDIA de biología molecular y química separadas de la física.</p><div id="bionemo-state" class="status-warn">Endpoint por configurar</div></article>
+      <article class="tool-card"><span class="tag">NVIDIA</span><h3>NIM / API Catalog</h3><p>Inferencia alojada y NIMs científicos registrados por el servidor.</p><div id="api-state" class="status-warn">API no comprobada</div></article>
+      <article class="tool-card ready"><span class="tag">Orchestration</span><h3>Multi-fidelity</h3><p>FLASH → Hybrid-PIC → full PIC → surrogate → uncertainty → active learning.</p><div class="status-good">Router definido</div></article>
+    </section>
+
+    <section class="tools-card" style="margin-top:22px">
+      <h2>Router físico de plasma</h2>
+      <p class="tools-note">Calcula escalas de Debye, skin depths, gyro-radii, beta y Alfvén Mach para proponer una jerarquía de modelos. Es un screening: no reemplaza validación física.</p>
+      <div class="input-grid">
+        <label>nₑ [m⁻³]<input id="r-ne" type="number" value="1e20"/></label>
+        <label>B [T]<input id="r-B" type="number" value="0.2" step="any"/></label>
+        <label>Tₑ [eV]<input id="r-Te" type="number" value="10" step="any"/></label>
+        <label>Tᵢ [eV]<input id="r-Ti" type="number" value="2" step="any"/></label>
+        <label>L [m]<input id="r-L" type="number" value="0.01" step="any"/></label>
+        <label>U [m/s]<input id="r-U" type="number" value="50000" step="any"/></label>
+        <label>A<input id="r-A" type="number" value="1" step="any"/></label>
+        <label>Z<input id="r-Z" type="number" value="1" step="any"/></label>
+        <label>λmfp [m] opcional<input id="r-mfp" type="number" step="any"/></label>
+      </div>
+      <div class="tools-actions check-row">
+        <label><input id="r-electron" type="checkbox"/> requiere cinética electrónica</label>
+        <label><input id="r-lowt" type="checkbox"/> plasma low-T 2D</label>
+        <label><input id="r-matter" type="checkbox"/> partículas atravesando materia</label>
+        <button id="run-physics-router" class="primary">Evaluar modelos</button>
+      </div>
+    </section>
+
+    <section class="tools-hero" style="margin-top:22px">
+      <article class="tools-card">
+        <h2>Monte Carlo de parámetros</h2>
+        <div class="tools-form">
+          <label>Distribuciones JSON<textarea id="mc-spec">{"B":{"dist":"normal","mean":2.0,"sd":0.1},"Te":{"dist":"uniform","low":8,"high":12}}</textarea></label>
+          <div class="input-grid two-cols"><label>N<input id="mc-n" type="number" value="100" min="1" max="5000"/></label><label>Seed<input id="mc-seed" type="number" value="42"/></label></div>
+          <button id="run-monte-carlo" class="primary">Generar muestras</button>
+          <p class="tools-note">Primera versión: variables escalares independientes. Las correlaciones se añadirán con un sampler explícito.</p>
+        </div>
+      </article>
+      <article class="tools-card">
+        <h2>Workers de simulación</h2>
+        <div id="workers-list" class="capability-list">Sin workers configurados.</div>
+        <p class="tools-note">Los workers se registran solo en el servidor. Aquí nunca se introduce una URL o token de cómputo.</p>
+      </article>
     </section>
 
     <section class="tools-hero" style="margin-top:22px">
       <article class="tools-card">
         <h2>Probar NVIDIA API</h2>
         <div class="tools-form">
-          <label>Consulta científica<textarea id="nvidia-prompt">Explica en tres puntos qué información física necesito antes de decidir si un shock magnetizado requiere Hall-MHD.</textarea></label>
+          <label>Consulta científica<textarea id="nvidia-prompt">Explica qué comparación mínima harías entre Hall-MHD y Hybrid-PIC para validar un shock magnetizado.</textarea></label>
           <button id="run-nvidia-chat" class="primary">Ejecutar NVIDIA</button>
-          <p class="tools-note">La clave NVIDIA nunca se envía al navegador. La llamada sale desde el backend de ScientificBrain.</p>
+          <p class="tools-note">Se habilitará cuando NVIDIA_API_KEY esté disponible.</p>
         </div>
       </article>
       <article class="tools-card">
-        <h2>Capacidad científica configurada</h2>
+        <h2>Capacidad NVIDIA/NIM configurada</h2>
         <div class="tools-form">
           <label>Capacidad<select id="capability-select"><option value="">Sin capacidades configuradas</option></select></label>
           <label>Entrada JSON<textarea id="capability-input">{}</textarea></label>
@@ -55,8 +101,8 @@
     </section>
 
     <section class="tools-card" style="margin-top:22px">
-      <div class="card-head"><h2>Salida</h2><button id="clear-tools-output" class="ghost">Limpiar</button></div>
-      <pre id="tools-output" class="tools-output">ScientificBrain Tools listo.</pre>
+      <div class="card-head"><h2>Salida científica</h2><button id="clear-tools-output" class="ghost">Limpiar</button></div>
+      <pre id="tools-output" class="tools-output">ScientificBrain Physics Tools listo.</pre>
     </section>
   </main>
   <script src="/assets/scientific_tools.js"></script>

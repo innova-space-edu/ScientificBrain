@@ -344,6 +344,20 @@ https://github.com/innova-space-edu/scientificbrain-physics-skills
 
 Planned extensions preserved in the toolkit roadmap are **PIC/hybrid routing, additional diagnostics, distributed simulation/training, active learning, and direct ScientificBrain orchestration**.
 
+
+## Physics orchestration — v0.24
+
+The Scientific Tools workspace now exposes source-grounded physics tooling independent of the NVIDIA credential:
+
+- a local plasma model router using Debye length, electron/ion skin depths, gyro-radii, plasma beta and Alfvén Mach;
+- reproducible Monte Carlo parameter sampling;
+- the 39-skill ScientificBrain Physics Toolkit;
+- source-grounded solver maps for FLASH, WarpX, PIConGPU, EDIPIC-2D, Geant4, PhysicsNeMo and openPMD;
+- a server-only physics worker registry for heavy solver/HPC jobs;
+- centralized NVIDIA/BioNeMo/PhysicsNeMo capabilities when the NVIDIA credential is available.
+
+Heavy simulations are never executed synchronously inside the browser or Vercel function. ScientificBrain submits immutable jobs only to workers configured in `SCIBRAIN_PHYSICS_WORKERS_JSON`. Browser requests cannot provide arbitrary worker URLs or worker tokens.
+
 ## Development
 
 ```bash

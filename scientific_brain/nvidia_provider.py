@@ -41,35 +41,9 @@ def _safe_endpoint(url: str) -> str:
 
 
 def physics_toolkit_manifest() -> dict[str, Any]:
-    return {
-        "name": "ScientificBrain Physics Skills",
-        "repository": os.getenv("SCIBRAIN_PHYSICS_SKILLS_REPO", PHYSICS_SKILLS_REPO),
-        "focus": ["plasma physics", "FLASH", "yt", "PhysicsNeMo", "2D/3D surrogate validation"],
-        "skills": [
-            "plasma-regime",
-            "plasma-dimensionless",
-            "flash-discover",
-            "flash-setup",
-            "flash-run",
-            "flash-sweep",
-            "flash-hdf5-yt",
-            "flash-shock-analysis",
-            "flash-extmhd",
-            "flash-validation",
-            "physicsnemo-plasma-discover",
-            "physicsnemo-flash-dataset",
-            "physicsnemo-plasma-train",
-            "physicsnemo-plasma-infer",
-            "flash-physicsnemo-pipeline",
-        ],
-        "planned_extensions": [
-            "PIC/hybrid routing",
-            "additional diagnostics",
-            "distributed simulation/training",
-            "active learning",
-            "direct ScientificBrain orchestration",
-        ],
-    }
+    from .physics_tools import physics_toolkit_manifest as _manifest
+
+    return _manifest()
 
 
 @dataclass(frozen=True)

@@ -10,6 +10,12 @@ from scientific_brain.graph_service import ScientificGraphService
 from scientific_brain.graph_store import ScientificGraphStore
 from scientific_brain.nvidia_provider import nvidia_provider_from_env, physics_toolkit_manifest
 from scientific_brain.persistence import hydrate_memory_from_snapshot
+from scientific_brain.physics_tools import (
+    monte_carlo_samples,
+    physics_worker_status,
+    route_plasma_model,
+    submit_physics_job,
+)
 from scientific_brain.providers import provider_from_env
 from scientific_brain.stage_stepper import StageStepper
 from scientific_brain.user_snapshot import UserSnapshotStore
@@ -65,6 +71,9 @@ class handler(BaseHTTPRequestHandler):
             if op == "physics_toolkit":
                 self._write(200, physics_toolkit_manifest())
                 return
+            if op == "physics_workers":
+                self._write(200, physics_worker_status())
+                return
             folder_id = (query.get("folder_id") or [""])[0]
             if not folder_id:
                 raise ValueError("folder_id is required")
@@ -105,6 +114,21 @@ class handler(BaseHTTPRequestHandler):
         op = self._op()
         try:
             payload = self._body()
+            if op == "physics_route":
+                self._write(200, route_plasma_model(payload))
+                return
+            if op == "physics_monte_carlo":
+                self._write(200, monte_carlo_samples(payload))
+                return
+            if op == "physics_submit_job":
+                worker = str(payload.get("worker") or "").strip()
+                job = payload.get("job") or {}
+                if not worker:
+                    raise ValueError("worker is required")
+                if not isinstance(job, dict):
+                    raise ValueError("job must be a JSON object")
+                self._write(202, submit_physics_job(worker, job))
+                return
             if op == "nvidia_invoke":
                 capability = str(payload.get("capability") or "").strip()
                 if not capability:
