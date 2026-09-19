@@ -1,0 +1,41 @@
+{
+  "flash": {
+    "image_uri": "REGION-docker.pkg.dev/PROJECT_ID/scientificbrain-solvers/flash-private:4.8",
+    "machine_type": "c3-standard-22",
+    "max_retry_count": 1
+  },
+  "warpx": {
+    "image_uri": "REGION-docker.pkg.dev/PROJECT_ID/scientificbrain-solvers/warpx:VERSION",
+    "machine_type": "g2-standard-8",
+    "gpu_type": "nvidia-l4",
+    "max_gpus_per_node": 1,
+    "install_gpu_drivers": true,
+    "max_retry_count": 1
+  },
+  "picongpu": {
+    "image_uri": "REGION-docker.pkg.dev/PROJECT_ID/scientificbrain-solvers/picongpu:VERSION",
+    "machine_type": "g2-standard-8",
+    "gpu_type": "nvidia-l4",
+    "max_gpus_per_node": 1,
+    "install_gpu_drivers": true,
+    "max_retry_count": 1
+  },
+  "edipic2d": {
+    "image_uri": "REGION-docker.pkg.dev/PROJECT_ID/scientificbrain-solvers/edipic2d:VERSION",
+    "machine_type": "c3-standard-8",
+    "max_retry_count": 1
+  },
+  "geant4": {
+    "image_uri": "REGION-docker.pkg.dev/PROJECT_ID/scientificbrain-solvers/geant4:11.4.2",
+    "machine_type": "c3-standard-8",
+    "max_retry_count": 1
+  },
+  "physicsnemo": {
+    "image_uri": "REGION-docker.pkg.dev/PROJECT_ID/scientificbrain-solvers/physicsnemo:2.2.2",
+    "machine_type": "g2-standard-8",
+    "gpu_type": "nvidia-l4",
+    "max_gpus_per_node": 1,
+    "install_gpu_drivers": true,
+    "max_retry_count": 1
+  }
+}
