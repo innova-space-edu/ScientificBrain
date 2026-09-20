@@ -9,6 +9,8 @@
     workers: null,
     gcp: null,
     gcpSetup: null,
+    nvidiaModels: null,
+    modelCatalog: null,
     lastPreparedJob: null,
     errors: {},
     currentView: "overview",
@@ -121,27 +123,48 @@
 
   function renderNvidia() {
     const s = state.status || {};
+    const modelState = state.nvidiaModels || {};
     const connected = !!s.hosted_api_configured;
     const warnings = s.configuration_warnings || [];
     const caps = s.capabilities || [];
+    const env = s.runtime_environment || modelState.runtime_environment || "local";
 
-    setSummary($("#summary-nvidia"), connected ? "Conectado" : "Pendiente", connected ? "good" : "warn");
-    $("#summary-nvidia-detail").textContent = connected ? "NVIDIA API disponible" : "API no disponible";
-    statePill($("#nvidia-view-state"), connected ? "Conectado" : "Pendiente", connected ? "good" : "warn");
+    setSummary($("#summary-nvidia"), connected ? "Conectado" : "No disponible aquí", connected ? "good" : "warn");
+    $("#summary-nvidia-detail").textContent = connected ? ("Modelo activo: " + (s.text_model || "—")) : ("NVIDIA_API_KEY no disponible en " + env);
+    statePill($("#nvidia-view-state"), connected ? "Conectado" : "Sin API key en este entorno", connected ? "good" : "warn");
     $("#run-nvidia-chat").disabled = !connected;
     $("#nav-nvidia-dot").className = "nav-dot " + (connected ? "good" : "warn");
 
+    const models = modelState.models || (s.text_model ? [s.text_model] : []);
+    const modelSelect = $("#nvidia-model-select");
+    modelSelect.innerHTML = models.length
+      ? models.map((m) => '<option value="' + m + '"' + (m === (modelState.current_model || s.text_model) ? " selected" : "") + ">" + m + "</option>").join("")
+      : '<option value="">Sin modelos disponibles en este deployment</option>';
+    modelSelect.disabled = !connected;
+
+    const customCaps = caps.filter((x) => !["nvidia-chat","local-nim-chat"].includes(x.name));
     const select = $("#capability-select");
-    select.innerHTML = caps
-      .filter((x) => x.name !== "nvidia-chat")
-      .map((x) => '<option value="' + x.name + '">' + x.name + " · " + x.domain + "</option>")
-      .join("") || '<option value="">Sin capacidades adicionales</option>';
+    select.innerHTML = customCaps.length
+      ? customCaps.map((x) => '<option value="' + x.name + '">' + x.name + " · " + x.domain + "</option>").join("")
+      : '<option value="">Sin endpoints científicos adicionales</option>';
+    $("#run-capability").disabled = !customCaps.length;
+
+    const summaries = s.capability_summary || [];
+    $("#nvidia-capability-cards").innerHTML = summaries.map((item) =>
+      '<article class="capability-card ' + (item.enabled ? "enabled" : "disabled") + '"><div><strong>' + item.label + '</strong><span>' + (item.enabled ? "Disponible" : "No configurado") + '</span></div><p>' + item.description + '</p></article>'
+    ).join("");
+    $("#nvidia-runtime-note").innerHTML = connected
+      ? '<strong>API alojada activa.</strong> El selector de modelos se carga desde <code>/v1/models</code> cuando NVIDIA lo expone.'
+      : '<strong>Este deployment no ve NVIDIA_API_KEY.</strong> Si la clave está en Production, un Preview seguirá apareciendo pendiente hasta asignarla también al entorno Preview.';
 
     $("#nvidia-status").innerHTML = [
-      row("API NVIDIA", connected ? "Conectada" : "Pendiente", connected ? "good" : "warn"),
+      row("Entorno", env, "neutral"),
+      row("API NVIDIA", connected ? "Conectada" : "Sin clave en este entorno", connected ? "good" : "warn"),
+      row("Modelo configurado", s.text_model || modelState.current_model || "—", "neutral"),
+      row("Modelos visibles", String(models.length), models.length ? "good" : "neutral"),
       row("NGC", s.ngc_key_configured ? "Configurado" : "Opcional", s.ngc_key_configured ? "good" : "neutral"),
       row("NIM local/remoto", s.local_nim_configured ? "Configurado" : "Opcional", s.local_nim_configured ? "good" : "neutral"),
-      row("Capacidades registradas", String(caps.length), "neutral"),
+      row("Endpoints científicos registrados", String(customCaps.length), customCaps.length ? "good" : "neutral"),
     ].join("");
 
     $("#nvidia-warnings").innerHTML = warnings.length
@@ -154,6 +177,8 @@
     const wif = setup.workload_identity || {};
     const gcp = state.gcp || {};
     const profiles = gcp.profiles || [];
+    const runtimeEnv = setup.runtime_environment || "local";
+    const primaryVarsReady = (setup.variables || []).slice(0, 3).every((v) => v.configured);
     const profileNames = new Set(profiles.map((p) => p.name));
     const total = 6;
     const count = profiles.length;
@@ -193,6 +218,7 @@
       : "Todavía no hay imágenes/perfiles de solver en Artifact Registry. Puedes preparar el manifiesto, pero no enviarlo aún.";
 
     $("#gcp-status").innerHTML = [
+      row("Entorno Vercel", runtimeEnv, "neutral"),
       row("Integración Batch", gcp.configured ? "Lista" : "Pendiente", gcp.configured ? "good" : "warn"),
       row("Región", gcp.region || "—", "neutral"),
       row("Perfiles de solver", String(count), count ? "good" : "neutral"),
@@ -205,9 +231,13 @@
       row("Vercel OIDC / WIF", wif.available ? "Disponible" : (wif.configured ? "Esperando token" : "Pendiente"), wif.available ? "good" : "warn") +
       row("FLASH privado", "Soportado", "good");
 
+    $("#gcp-env-note").innerHTML = runtimeEnv === "preview"
+      ? '<strong>Entorno Preview.</strong> Las variables de Production no se copian automáticamente. Este Preview necesita las mismas variables no secretas asignadas a Preview y un subject WIF autorizado para <code>environment:preview</code>.'
+      : '<strong>Entorno ' + runtimeEnv + '.</strong> La identidad OIDC se valida específicamente para este entorno.';
+
     const steps = [
-      { done: !!state.status?.hosted_api_configured, title: "NVIDIA API", text: state.status?.hosted_api_configured ? "Conectada y disponible." : "Revisar la API NVIDIA." },
-      { done: !!wif.available, title: "Vercel → Google WIF", text: wif.available ? "Autenticación temporal funcionando." : (wif.configured ? "Google está configurado; falta que Vercel entregue el token OIDC al runtime." : "Completar Workload Identity Federation.") },
+      { done: primaryVarsReady, title: "Variables Google Cloud", text: primaryVarsReady ? "Proyecto, bucket y service account están visibles en este entorno." : (runtimeEnv === "preview" ? "Asignar las variables SCIBRAIN_GCP_* también al entorno Preview de Vercel." : "Completar las variables SCIBRAIN_GCP_* del deployment.") },
+      { done: !!wif.available, title: "Vercel → Google WIF", text: wif.available ? "Autenticación temporal funcionando." : (wif.configured ? "La configuración WIF existe; falta token/autorización para el subject de este entorno." : "Completar Workload Identity Federation para este entorno.") },
       { done: count === total, title: "Imágenes de ejecución", text: count === total ? "Los seis motores tienen perfil cloud." : "Crear FLASH, WarpX, PIConGPU, EDIPIC-2D, Geant4 y PhysicsNeMo en Artifact Registry." },
       { done: !!gcp.configured, title: "Google Batch", text: gcp.configured ? "Ejecución cloud habilitada." : "Activar Batch después de crear los perfiles." },
     ];
@@ -222,6 +252,43 @@
     const next = steps.find((s) => !s.done) || { title: "Sistema listo", text: "Puedes ejecutar campañas científicas desde ScientificBrain." };
     $("#next-milestone").textContent = next.title;
     $("#next-milestone-detail").textContent = next.text;
+  }
+
+  function renderModelCatalog() {
+    const catalog = state.modelCatalog?.solvers || {};
+    $$(".solver-card").forEach((card) => {
+      const spec = catalog[card.dataset.solver];
+      const target = card.querySelector(".solver-models");
+      if (!target) return;
+      target.innerHTML = spec?.models?.length
+        ? spec.models.map((m) => '<span title="' + m.description.replace(/"/g, "&quot;") + '">' + m.label + "</span>").join("")
+        : '<span>Catálogo pendiente</span>';
+    });
+    updateJobModelOptions();
+  }
+
+  function updateJobModelOptions() {
+    const solver = $("#job-solver")?.value;
+    const spec = state.modelCatalog?.solvers?.[solver];
+    if (!spec) return;
+    const modelSelect = $("#job-model");
+    modelSelect.innerHTML = spec.models.map((m) => '<option value="' + m.id + '">' + m.label + "</option>").join("");
+    modelSelect.value = spec.default_model;
+    const actionSelect = $("#job-action");
+    const previousAction = actionSelect.value;
+    actionSelect.innerHTML = (spec.actions || []).map((a) => '<option value="' + a + '">' + a + "</option>").join("");
+    if ((spec.actions || []).includes(previousAction)) actionSelect.value = previousAction;
+    const selected = spec.models.find((m) => m.id === modelSelect.value);
+    $("#job-model-help").textContent = selected?.description || "";
+    state.lastPreparedJob = null;
+  }
+
+  function updateJobModelHelp() {
+    const solver = $("#job-solver")?.value;
+    const spec = state.modelCatalog?.solvers?.[solver];
+    const selected = spec?.models?.find((m) => m.id === $("#job-model")?.value);
+    $("#job-model-help").textContent = selected?.description || "";
+    state.lastPreparedJob = null;
   }
 
   function renderSkills() {
@@ -249,6 +316,7 @@
   function render() {
     renderNvidia();
     renderGoogle();
+    renderModelCatalog();
     renderSkills();
     renderErrors();
   }
@@ -260,6 +328,8 @@
       ["workers", "/api/science?op=physics_workers"],
       ["gcp", "/api/science?op=gcp_batch_status"],
       ["gcpSetup", "/api/science?op=gcp_setup_plan"],
+      ["nvidiaModels", "/api/science?op=nvidia_models"],
+      ["modelCatalog", "/api/science?op=physics_model_catalog"],
     ];
 
     const results = await Promise.allSettled(requests.map(([, url]) => api(url)));
@@ -274,6 +344,8 @@
         if (key === "nvidia") state.status = { capabilities: [], configuration_warnings: [prettyError(result.reason)] };
         else if (key === "toolkit") state.toolkit = { implemented_extensions: [] };
         else if (key === "workers") state.workers = { workers: [] };
+        else if (key === "modelCatalog") state.modelCatalog = { solvers: {} };
+        else if (key === "nvidiaModels") state.nvidiaModels = { models: [] };
         else state[key] = {};
       }
     });
@@ -298,6 +370,64 @@
     } catch {}
 
     await loadStatus();
+  }
+
+  const MC_PARAM_SCHEMAS = {
+    normal: [["mean","Media"],["sd","Desv. estándar"]],
+    uniform: [["low","Mínimo"],["high","Máximo"]],
+    lognormal: [["mu","μ log"],["sigma","σ log"]],
+    triangular: [["low","Mínimo"],["high","Máximo"],["mode","Moda"]],
+    fixed: [["value","Valor fijo"]],
+  };
+
+  function renderMcParams(row, values = {}) {
+    const dist = row.querySelector(".mc-dist").value;
+    const target = row.querySelector(".mc-params");
+    target.innerHTML = (MC_PARAM_SCHEMAS[dist] || []).map(([key,label]) =>
+      '<label>' + label + '<input class="mc-param" data-key="' + key + '" type="number" step="any" value="' + (values[key] ?? "") + '"/></label>'
+    ).join("");
+  }
+
+  function addMcVariable(initial = {}) {
+    const row = document.createElement("div");
+    row.className = "mc-variable-row";
+    row.innerHTML = '<label>Variable<input class="mc-name" value="' + (initial.name || "") + '" placeholder="Ej. B, Te, ne"/></label>' +
+      '<label>Distribución<select class="mc-dist"><option value="normal">Normal</option><option value="uniform">Uniforme</option><option value="lognormal">Lognormal</option><option value="triangular">Triangular</option><option value="fixed">Fija</option></select></label>' +
+      '<div class="mc-params"></div><button type="button" class="mc-remove ghost" title="Eliminar variable">Eliminar</button>';
+    $("#mc-variables").appendChild(row);
+    row.querySelector(".mc-dist").value = initial.dist || "normal";
+    renderMcParams(row, initial);
+    row.querySelector(".mc-dist").addEventListener("change", () => renderMcParams(row));
+    row.querySelector(".mc-remove").addEventListener("click", () => row.remove());
+  }
+
+  function collectMonteCarloDistributions() {
+    const distributions = {};
+    $$(".mc-variable-row").forEach((row) => {
+      const name = row.querySelector(".mc-name").value.trim();
+      if (!name) throw new Error("Cada variable Monte Carlo necesita un nombre");
+      if (distributions[name]) throw new Error("Variable Monte Carlo repetida: " + name);
+      const spec = { dist: row.querySelector(".mc-dist").value };
+      row.querySelectorAll(".mc-param").forEach((input) => {
+        if (input.value.trim() === "") throw new Error("Falta " + input.dataset.key + " para " + name);
+        spec[input.dataset.key] = Number(input.value);
+      });
+      distributions[name] = spec;
+    });
+    if (!Object.keys(distributions).length) throw new Error("Agrega al menos una variable Monte Carlo");
+    return distributions;
+  }
+
+  function syncMonteCarloJson() {
+    try { $("#mc-spec").value = JSON.stringify(collectMonteCarloDistributions(), null, 2); }
+    catch (e) { showResult("Monte Carlo", prettyError(e)); }
+  }
+
+  function initMonteCarloBuilder() {
+    if ($("#mc-variables")?.children.length) return;
+    addMcVariable({name:"B",dist:"normal",mean:2.0,sd:0.1});
+    addMcVariable({name:"Te",dist:"uniform",low:8,high:12});
+    syncMonteCarloJson();
   }
 
   function num(id) {
@@ -350,8 +480,13 @@
   async function runMonteCarlo() {
     try {
       let distributions;
-      try { distributions = JSON.parse($("#mc-spec").value || "{}"); }
-      catch { throw new Error("Distribuciones JSON inválidas"); }
+      if ($("#mc-use-json").checked) {
+        try { distributions = JSON.parse($("#mc-spec").value || "{}"); }
+        catch { throw new Error("JSON avanzado inválido"); }
+      } else {
+        distributions = collectMonteCarloDistributions();
+        $("#mc-spec").value = JSON.stringify(distributions, null, 2);
+      }
       const result = await api("/api/science?op=physics_monte_carlo", {
         method: "POST",
         body: JSON.stringify({ distributions, n: Number($("#mc-n").value), seed: Number($("#mc-seed").value) }),
@@ -366,7 +501,7 @@
       if (!prompt) throw new Error("Escribe una consulta");
       showResult("NVIDIA", await api("/api/science?op=nvidia_invoke", {
         method: "POST",
-        body: JSON.stringify({ capability: "nvidia-chat", input: { prompt } }),
+        body: JSON.stringify({ capability: "nvidia-chat", input: { prompt, model: $("#nvidia-model-select").value } }),
       }));
     } catch (e) { showResult("Error NVIDIA", prettyError(e)); }
   }
@@ -439,6 +574,8 @@
       "#refresh-status": loadStatus,
       "#run-physics-router": runRouter,
       "#run-monte-carlo": runMonteCarlo,
+      "#mc-add-variable": () => addMcVariable({dist:"normal"}),
+      "#mc-sync-json": syncMonteCarloJson,
       "#run-nvidia-chat": runNvidia,
       "#run-capability": runCapability,
       "#prepare-physics-job": prepareJob,
@@ -449,6 +586,10 @@
       "#get-gcp-manifest": getManifest,
     };
     Object.entries(actions).forEach(([selector, fn]) => $(selector)?.addEventListener("click", fn));
+
+    $("#job-solver")?.addEventListener("change", updateJobModelOptions);
+    $("#job-model")?.addEventListener("change", updateJobModelHelp);
+    initMonteCarloBuilder();
 
     $("#clear-tools-output")?.addEventListener("click", () => {
       $("#tools-output").textContent = "";

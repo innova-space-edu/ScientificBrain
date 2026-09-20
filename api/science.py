@@ -12,7 +12,7 @@ from scientific_brain.google_batch import google_batch_from_env
 from scientific_brain.google_setup import google_cloud_setup_plan
 from scientific_brain.nvidia_provider import nvidia_provider_from_env, physics_toolkit_manifest
 from scientific_brain.persistence import hydrate_memory_from_snapshot
-from scientific_brain.physics_jobs import physics_execution_profiles, prepare_physics_job
+from scientific_brain.physics_jobs import physics_execution_profiles, physics_model_catalog, prepare_physics_job
 from scientific_brain.physics_tools import (
     monte_carlo_samples,
     physics_worker_status,
@@ -79,6 +79,12 @@ class handler(BaseHTTPRequestHandler):
                 return
             if op == "physics_profiles":
                 self._write(200, physics_execution_profiles())
+                return
+            if op == "physics_model_catalog":
+                self._write(200, physics_model_catalog())
+                return
+            if op == "nvidia_models":
+                self._write(200, nvidia_provider_from_env().models_status())
                 return
             if op == "gcp_batch_status":
                 self._write(200, google_batch_from_env().status())

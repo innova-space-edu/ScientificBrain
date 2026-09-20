@@ -33,6 +33,82 @@ _ACTIONS: dict[str, set[str]] = {
 }
 
 
+def physics_model_catalog() -> dict[str, Any]:
+    return {
+        "schema_version": "0.1",
+        "solvers": {
+            "flash": {
+                "label": "FLASH",
+                "default_model": "hall-mhd",
+                "actions": sorted(_ACTIONS["flash"]),
+                "models": [
+                    {"id": "hydro", "label": "Hydrodynamics", "description": "Baseline hydrodynamics without magnetic-field evolution."},
+                    {"id": "ideal-mhd", "label": "Ideal MHD", "description": "Ideal magnetohydrodynamic baseline."},
+                    {"id": "resistive-mhd", "label": "Resistive MHD", "description": "MHD with finite magnetic resistivity."},
+                    {"id": "hall-mhd", "label": "Hall MHD", "description": "Extended fluid model including Hall physics."},
+                    {"id": "extended-mhd", "label": "Extended MHD", "description": "Hall/transport extensions such as Biermann, Nernst, Seebeck and cross-field terms when enabled by the FLASH setup."},
+                ],
+            },
+            "warpx": {
+                "label": "WarpX",
+                "default_model": "hybrid-pic",
+                "actions": sorted(_ACTIONS["warpx"]),
+                "models": [
+                    {"id": "hybrid-pic", "label": "Hybrid-PIC", "description": "Kinetic ions with fluid electrons."},
+                    {"id": "full-pic-em", "label": "Full PIC · electromagnetic", "description": "Kinetic particles with electromagnetic field evolution."},
+                    {"id": "full-pic-es", "label": "Full PIC · electrostatic", "description": "Electrostatic PIC configuration when appropriate."},
+                    {"id": "pic-mcc", "label": "PIC + MCC", "description": "PIC with Monte Carlo collisions against a background gas."},
+                    {"id": "pic-dsmc", "label": "PIC + DSMC", "description": "PIC with direct-simulation Monte Carlo collision modeling."},
+                ],
+            },
+            "picongpu": {
+                "label": "PIConGPU",
+                "default_model": "electromagnetic-pic",
+                "actions": sorted(_ACTIONS["picongpu"]),
+                "models": [
+                    {"id": "electromagnetic-pic", "label": "Electromagnetic full PIC", "description": "GPU/HPC electromagnetic particle-in-cell simulation."},
+                    {"id": "picmi-electromagnetic", "label": "PICMI electromagnetic", "description": "Electromagnetic setup generated through the PIConGPU PICMI interface."},
+                    {"id": "ionization-pic", "label": "PIC + ionization", "description": "Full PIC configuration including supported ionization interactions."},
+                ],
+            },
+            "edipic2d": {
+                "label": "EDIPIC-2D",
+                "default_model": "electrostatic-pic-2d",
+                "actions": sorted(_ACTIONS["edipic2d"]),
+                "models": [
+                    {"id": "electrostatic-pic-2d", "label": "Electrostatic PIC 2D", "description": "Two-dimensional PIC model for low-temperature plasma applications."},
+                    {"id": "low-temperature-discharge-2d", "label": "Low-temperature discharge 2D", "description": "EDIPIC-2D configuration for bounded/discharge plasma studies."},
+                ],
+            },
+            "geant4": {
+                "label": "Geant4",
+                "default_model": "electromagnetic-transport",
+                "actions": sorted(_ACTIONS["geant4"]),
+                "models": [
+                    {"id": "electromagnetic-transport", "label": "Electromagnetic transport", "description": "Particle transport using an electromagnetic physics-list configuration."},
+                    {"id": "hadronic-transport", "label": "Hadronic transport", "description": "Particle transport using an appropriate hadronic physics list."},
+                    {"id": "optical-photon-transport", "label": "Optical photon transport", "description": "Optical processes and photon transport."},
+                    {"id": "custom-physics-list", "label": "Custom physics list", "description": "Explicit application-owned Geant4 physics-list configuration."},
+                ],
+            },
+            "physicsnemo": {
+                "label": "PhysicsNeMo",
+                "default_model": "fno",
+                "actions": sorted(_ACTIONS["physicsnemo"]),
+                "models": [
+                    {"id": "fno", "label": "FNO", "description": "Fourier Neural Operator surrogate."},
+                    {"id": "pino", "label": "PINO", "description": "Physics-Informed Neural Operator."},
+                    {"id": "meshgraphnet", "label": "MeshGraphNet", "description": "Graph neural network for mesh-based physical systems."},
+                    {"id": "pinn", "label": "PINN", "description": "Physics-informed neural network."},
+                    {"id": "transolver", "label": "Transolver", "description": "Transformer-style architecture for scientific fields."},
+                    {"id": "diffusion-surrogate", "label": "Diffusion surrogate", "description": "Diffusion-model-based scientific surrogate."},
+                ],
+            },
+        },
+        "note": "Model entries are ScientificBrain execution presets. Solver-specific input artifacts still define the complete physical/numerical setup.",
+    }
+
+
 class ResourceRequest(BaseModel):
     nodes: int = Field(default=1, ge=1, le=256)
     cpus: int = Field(default=4, ge=1, le=4096)
@@ -109,10 +185,13 @@ def _assert_safe_mapping(value: dict[str, Any], label: str) -> None:
 
 
 def physics_execution_profiles() -> dict[str, Any]:
+    model_catalog = physics_model_catalog()["solvers"]
     return {
         "schema_version": "0.1",
         "profiles": {
             "flash": {
+                "models": model_catalog["flash"]["models"],
+                "default_model": model_catalog["flash"]["default_model"],
                 "role": "fluid plasma / MHD / Extended-MHD",
                 "input_contract": "FLASH object/run configuration or parameter artifact",
                 "native_outputs": ["FLASH HDF5 plotfiles", "checkpoints", "log"],
@@ -120,6 +199,8 @@ def physics_execution_profiles() -> dict[str, Any]:
                 "recommended_validation": ["benchmark", "resolution convergence", "div(B)", "observable convergence"],
             },
             "warpx": {
+                "models": model_catalog["warpx"]["models"],
+                "default_model": model_catalog["warpx"]["default_model"],
                 "role": "Hybrid-PIC / full PIC / MCC / DSMC",
                 "input_contract": "WarpX input deck or approved PICMI artifact",
                 "native_outputs": ["plot/openPMD diagnostics", "checkpoints", "run metadata"],
@@ -127,6 +208,8 @@ def physics_execution_profiles() -> dict[str, Any]:
                 "recommended_validation": ["charge conservation", "energy balance", "mesh/time/particle convergence"],
             },
             "picongpu": {
+                "models": model_catalog["picongpu"]["models"],
+                "default_model": model_catalog["picongpu"]["default_model"],
                 "role": "GPU/HPC full kinetic PIC",
                 "input_contract": "approved PIConGPU parameter/template artifact",
                 "native_outputs": ["openPMD", "plugins", "checkpoints"],
@@ -134,6 +217,8 @@ def physics_execution_profiles() -> dict[str, Any]:
                 "recommended_validation": ["charge conservation", "energy diagnostics", "particle convergence", "scaling separation"],
             },
             "edipic2d": {
+                "models": model_catalog["edipic2d"]["models"],
+                "default_model": model_catalog["edipic2d"]["default_model"],
                 "role": "2D low-temperature plasma PIC",
                 "input_contract": "complete EDIPIC-2D input directory artifact",
                 "native_outputs": ["EDIPIC diagnostic/output files"],
@@ -141,6 +226,8 @@ def physics_execution_profiles() -> dict[str, Any]:
                 "recommended_validation": ["particle noise", "field convergence", "current/energy balance"],
             },
             "geant4": {
+                "models": model_catalog["geant4"]["models"],
+                "default_model": model_catalog["geant4"]["default_model"],
                 "role": "Monte Carlo particle transport through matter",
                 "input_contract": "built application + macro/geometry/material artifact",
                 "native_outputs": ["scoring/statistical outputs"],
@@ -148,6 +235,8 @@ def physics_execution_profiles() -> dict[str, Any]:
                 "recommended_validation": ["physics-list justification", "sample convergence", "benchmark/data comparison"],
             },
             "physicsnemo": {
+                "models": model_catalog["physicsnemo"]["models"],
+                "default_model": model_catalog["physicsnemo"]["default_model"],
                 "role": "scientific ML / surrogate / PINO / active learning",
                 "input_contract": "versioned dataset + training/inference config artifact",
                 "native_outputs": ["checkpoints", "metrics", "predictions"],

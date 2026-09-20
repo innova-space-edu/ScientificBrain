@@ -55,8 +55,11 @@ def google_cloud_setup_plan() -> dict[str, Any]:
         "vercel_oidc_token": bool(wif.subject_token),
     }
 
+    runtime_environment = os.getenv("VERCEL_ENV", "local").strip() or "local"
+
     return {
         "region": region,
+        "runtime_environment": runtime_environment,
         "ready": all(item["configured"] for item in variables),
         "variables": variables,
         "profiles_valid_json": profiles_valid,
@@ -77,7 +80,7 @@ def google_cloud_setup_plan() -> dict[str, Any]:
             "expected_vercel_subject": (
                 f"owner:{os.getenv('SCIBRAIN_VERCEL_TEAM', '').strip()}:"
                 f"project:{os.getenv('SCIBRAIN_VERCEL_PROJECT', '').strip()}:"
-                "environment:production"
+                f"environment:{runtime_environment}"
                 if os.getenv("SCIBRAIN_VERCEL_TEAM", "").strip()
                 and os.getenv("SCIBRAIN_VERCEL_PROJECT", "").strip()
                 else None
@@ -89,6 +92,11 @@ def google_cloud_setup_plan() -> dict[str, Any]:
             ),
             "job_service_account_name": "scibrain-batch-job",
         },
+        "preview_note": (
+            "Preview deployments need the same non-secret SCIBRAIN_GCP_* variables assigned to the Preview environment, and Google WIF must authorize the preview subject separately."
+            if runtime_environment == "preview"
+            else None
+        ),
         "notes": [
             "FLASH can run on Google Cloud Batch using a private image built from an authorized source checkout.",
             "FLASH source and FLASH container images must not be redistributed publicly.",

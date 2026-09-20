@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Centro científico · ScientificBrain</title>
   <link rel="stylesheet" href="/assets/styles.css"/>
-  <link rel="stylesheet" href="/assets/scientific_tools.css?v=31-sidebar"/>
+  <link rel="stylesheet" href="/assets/scientific_tools.css?v=32-tools"/>
   <style>
     html,body{margin:0;height:100%;overflow:hidden}
     body.science-app{display:block;background:#f6f7fb;color:#172033}
@@ -127,9 +127,11 @@
         <div class="panel-card">
           <div class="panel-heading"><div><p class="eyebrow">Incertidumbre</p><h2>Monte Carlo / UQ</h2></div><span class="state-pill good">Disponible</span></div>
           <p class="panel-copy">Genera muestras reproducibles de parámetros para campañas numéricas e incertidumbre. La primera versión usa variables escalares independientes.</p>
-          <div class="form-stack">
-            <label>Distribuciones JSON<textarea id="mc-spec">{"B":{"dist":"normal","mean":2.0,"sd":0.1},"Te":{"dist":"uniform","low":8,"high":12}}</textarea></label>
-            <div class="input-grid two-cols"><label>N<input id="mc-n" type="number" value="100" min="1" max="5000"/></label><label>Seed<input id="mc-seed" type="number" value="42"/></label></div>
+          <div class="mc-builder">
+            <div class="mc-toolbar"><div><strong>Variables aleatorias</strong><span>Agrega las variables del caso y elige su distribución.</span></div><button id="mc-add-variable" class="secondary" type="button">+ Agregar variable</button></div>
+            <div id="mc-variables" class="mc-variables"></div>
+            <div class="input-grid two-cols"><label>Número de muestras<input id="mc-n" type="number" value="100" min="1" max="5000"/></label><label>Seed reproducible<input id="mc-seed" type="number" value="42"/></label></div>
+            <details class="advanced-inline"><summary>JSON avanzado</summary><label class="check-inline"><input id="mc-use-json" type="checkbox"/> Usar este JSON en lugar del constructor visual</label><textarea id="mc-spec">{"B":{"dist":"normal","mean":2.0,"sd":0.1},"Te":{"dist":"uniform","low":8,"high":12}}</textarea><button id="mc-sync-json" class="ghost" type="button">Actualizar JSON desde el constructor</button></details>
             <button id="run-monte-carlo" class="primary">Generar muestras</button>
           </div>
         </div>
@@ -138,18 +140,22 @@
       <section class="science-view" data-view-panel="nvidia">
         <div class="panel-card">
           <div class="panel-heading"><div><p class="eyebrow">IA científica</p><h2>NVIDIA</h2></div><span id="nvidia-view-state" class="state-pill">Comprobando</span></div>
-          <p class="panel-copy">La API NVIDIA está separada de las GPU de simulación. Aquí se usan endpoints alojados/NIM para razonamiento y capacidades científicas.</p>
+          <p class="panel-copy">La API NVIDIA es una capa de inferencia distinta de las GPU usadas para simulaciones. Aquí puedes elegir el modelo alojado disponible; PhysicsNeMo sigue apareciendo como motor científico en Simuladores.</p>
+          <div id="nvidia-runtime-note" class="context-note"></div>
+          <div id="nvidia-capability-cards" class="capability-grid"></div>
           <div class="split-grid">
             <div class="form-stack">
               <h3>Consulta científica</h3>
+              <label>Modelo NVIDIA<select id="nvidia-model-select"><option value="">Comprobando modelos…</option></select></label>
               <label>Consulta<textarea id="nvidia-prompt">Explica qué comparación mínima harías entre Hall-MHD y Hybrid-PIC para validar un shock magnetizado.</textarea></label>
               <button id="run-nvidia-chat" class="primary">Ejecutar NVIDIA</button>
             </div>
             <div class="form-stack">
-              <h3>Capacidad NIM registrada</h3>
-              <label>Capacidad<select id="capability-select"><option value="">Sin capacidades adicionales</option></select></label>
+              <h3>Endpoints científicos opcionales</h3>
+              <p class="mini-copy">BioNeMo u otros NIM especializados aparecen aquí solo cuando su endpoint se registra en el servidor. No son necesarios para usar el chat NVIDIA.</p>
+              <label>Endpoint registrado<select id="capability-select"><option value="">Sin endpoints científicos adicionales</option></select></label>
               <label>Entrada JSON<textarea id="capability-input">{}</textarea></label>
-              <button id="run-capability" class="secondary">Ejecutar capacidad</button>
+              <button id="run-capability" class="secondary">Ejecutar endpoint</button>
             </div>
           </div>
         </div>
@@ -162,7 +168,7 @@
           <div class="input-grid">
             <label>Solver<select id="job-solver"><option value="flash">FLASH</option><option value="warpx">WarpX</option><option value="picongpu">PIConGPU</option><option value="edipic2d">EDIPIC-2D</option><option value="geant4">Geant4</option><option value="physicsnemo">PhysicsNeMo</option></select></label>
             <label>Acción<select id="job-action"><option value="run">run</option><option value="validate">validate</option><option value="sweep">sweep</option><option value="analyze">analyze</option><option value="train">train</option><option value="infer">infer</option></select></label>
-            <label>Modelo<input id="job-model" value="hall-mhd"/></label>
+            <label>Modelo / configuración<select id="job-model"><option value="hall-mhd">Hall MHD</option></select><small id="job-model-help" class="field-help"></small></label>
             <label>Artefacto<input id="job-input" value="campaigns/example/input"/></label>
             <label>GPU<input id="job-gpus" type="number" value="0" min="0"/></label>
           </div>
@@ -179,14 +185,14 @@
       <section class="science-view" data-view-panel="solvers">
         <div class="panel-card">
           <div class="panel-heading"><div><p class="eyebrow">Motores</p><h2>Simuladores y entrenamiento</h2></div></div>
-          <p class="panel-copy">Las skills ya conocen cada motor. El indicador muestra si existe además una imagen/perfil cloud configurado para ejecutarlo desde Google Batch.</p>
+          <p class="panel-copy">Las skills conocen varios modelos/configuraciones por motor. El indicador cloud es independiente: muestra si además existe una imagen/perfil para ejecutarlo en Google Batch.</p>
           <div class="solver-grid">
-            <article class="solver-card" data-solver="flash"><div class="solver-head"><strong>FLASH</strong><span class="solver-status">Comprobando</span></div><p>MHD, resistivo, Hall y Extended-MHD.</p><small>CPU / MPI · HDF5 / yt</small></article>
-            <article class="solver-card" data-solver="warpx"><div class="solver-head"><strong>WarpX</strong><span class="solver-status">Comprobando</span></div><p>Hybrid-PIC, full PIC, MCC y DSMC.</p><small>NVIDIA GPU · openPMD</small></article>
-            <article class="solver-card" data-solver="picongpu"><div class="solver-head"><strong>PIConGPU</strong><span class="solver-status">Comprobando</span></div><p>PIC cinético GPU/HPC a gran escala.</p><small>NVIDIA GPU / multi-node · openPMD</small></article>
-            <article class="solver-card" data-solver="edipic2d"><div class="solver-head"><strong>EDIPIC-2D</strong><span class="solver-status">Comprobando</span></div><p>Plasma de baja temperatura en 2D.</p><small>CPU / MPI · PETSc / HYPRE</small></article>
-            <article class="solver-card" data-solver="geant4"><div class="solver-head"><strong>Geant4</strong><span class="solver-status">Comprobando</span></div><p>Monte Carlo de partículas y radiación en materia.</p><small>CPU · scoring</small></article>
-            <article class="solver-card" data-solver="physicsnemo"><div class="solver-head"><strong>PhysicsNeMo</strong><span class="solver-status">Comprobando</span></div><p>FNO/PINO, surrogate, distributed training y active learning.</p><small>NVIDIA GPU · SciML</small></article>
+            <article class="solver-card" data-solver="flash"><div class="solver-head"><strong>FLASH</strong><span class="solver-status">Comprobando</span></div><p>MHD, resistivo, Hall y Extended-MHD.</p><small>CPU / MPI · HDF5 / yt</small><div class="solver-models"></div></article>
+            <article class="solver-card" data-solver="warpx"><div class="solver-head"><strong>WarpX</strong><span class="solver-status">Comprobando</span></div><p>Hybrid-PIC, full PIC, MCC y DSMC.</p><small>NVIDIA GPU · openPMD</small><div class="solver-models"></div></article>
+            <article class="solver-card" data-solver="picongpu"><div class="solver-head"><strong>PIConGPU</strong><span class="solver-status">Comprobando</span></div><p>PIC cinético GPU/HPC a gran escala.</p><small>NVIDIA GPU / multi-node · openPMD</small><div class="solver-models"></div></article>
+            <article class="solver-card" data-solver="edipic2d"><div class="solver-head"><strong>EDIPIC-2D</strong><span class="solver-status">Comprobando</span></div><p>Plasma de baja temperatura en 2D.</p><small>CPU / MPI · PETSc / HYPRE</small><div class="solver-models"></div></article>
+            <article class="solver-card" data-solver="geant4"><div class="solver-head"><strong>Geant4</strong><span class="solver-status">Comprobando</span></div><p>Monte Carlo de partículas y radiación en materia.</p><small>CPU · scoring</small><div class="solver-models"></div></article>
+            <article class="solver-card" data-solver="physicsnemo"><div class="solver-head"><strong>PhysicsNeMo</strong><span class="solver-status">Comprobando</span></div><p>FNO/PINO, surrogate, distributed training y active learning.</p><small>NVIDIA GPU · SciML</small><div class="solver-models"></div></article>
           </div>
         </div>
       </section>
@@ -194,7 +200,7 @@
       <section class="science-view" data-view-panel="google">
         <div class="panel-card">
           <div class="panel-heading"><div><p class="eyebrow">Cloud compute</p><h2>Google Cloud</h2></div><span id="google-view-state" class="state-pill">Comprobando</span></div>
-          <p class="panel-copy">Aquí se concentra únicamente lo necesario para pasar de ScientificBrain a Google Batch y Compute Engine. No se mezclan las herramientas científicas con la configuración cloud.</p>
+          <p class="panel-copy">Aquí se concentra únicamente lo necesario para pasar de ScientificBrain a Google Batch y Compute Engine. Preview y Production son identidades OIDC distintas y se verifican por separado.</p><div id="gcp-env-note" class="context-note"></div>
           <div id="setup-steps" class="setup-steps"></div>
           <div class="tools-actions"><button id="test-gcp-auth" class="secondary">Probar Vercel → Google WIF</button></div>
         </div>
@@ -251,6 +257,6 @@
     </div>
   </main>
 
-  <script src="/assets/scientific_tools.js?v=31-sidebar"></script>
+  <script src="/assets/scientific_tools.js?v=32-tools"></script>
 </body>
 </html>

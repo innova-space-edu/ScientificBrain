@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlparse
@@ -146,12 +147,69 @@ class NvidiaProvider:
             raise RuntimeError("NVIDIA returned an empty response")
         return content if isinstance(content, str) else str(content)
 
-    def complete(self, system: str, user: str) -> str:
+    def models_status(self) -> dict[str, Any]:
+        fallback = [self.text_model] if self.text_model else []
+        if not self.hosted_configured:
+            return {
+                "configured": False,
+                "current_model": self.text_model or None,
+                "models": fallback,
+                "source": "configured-default",
+                "runtime_environment": os.getenv("VERCEL_ENV", "local"),
+                "detail": "NVIDIA_API_KEY is not available in this deployment.",
+            }
+        try:
+            response = httpx.get(
+                self.api_base.rstrip("/") + "/models",
+                headers={"Authorization": f"Bearer {self.api_key}"},
+                timeout=min(self.timeout, 30.0),
+            )
+            response.raise_for_status()
+            payload = response.json()
+            items = payload.get("data") or payload.get("models") or []
+            models = []
+            for item in items:
+                model_id = item.get("id") if isinstance(item, dict) else item
+                model_id = str(model_id or "").strip()
+                if model_id and model_id not in models:
+                    models.append(model_id)
+            if self.text_model and self.text_model not in models:
+                models.insert(0, self.text_model)
+            return {
+                "configured": True,
+                "current_model": self.text_model,
+                "models": models or fallback,
+                "source": "nvidia-v1-models",
+                "runtime_environment": os.getenv("VERCEL_ENV", "local"),
+            }
+        except Exception as exc:
+            return {
+                "configured": True,
+                "current_model": self.text_model,
+                "models": fallback,
+                "source": "configured-default",
+                "runtime_environment": os.getenv("VERCEL_ENV", "local"),
+                "warning": f"{type(exc).__name__}: model catalog could not be loaded",
+            }
+
+    def _validate_hosted_model(self, model: str) -> str:
+        model = str(model or "").strip()
+        if not model or len(model) > 180 or not re.fullmatch(r"[A-Za-z0-9._:/+-]+", model):
+            raise ValueError("Invalid NVIDIA model ID")
+        if model == self.text_model:
+            return model
+        available = self.models_status().get("models") or []
+        if model not in available:
+            raise ValueError("Requested NVIDIA model is not in the available model catalog")
+        return model
+
+    def complete(self, system: str, user: str, *, model: str | None = None) -> str:
         if not self.hosted_configured:
             raise RuntimeError("NVIDIA_API_KEY is not configured")
+        selected_model = self._validate_hosted_model(model or self.text_model)
         return self._chat(
             base_url=self.api_base,
-            model=self.text_model,
+            model=selected_model,
             api_key=self.api_key,
             system=system,
             user=user,
@@ -231,6 +289,13 @@ class NvidiaProvider:
             "local_nim_model": self.nim_model if self.local_nim_configured else None,
             "capabilities": self.capabilities(),
             "configuration_warnings": self._custom_capabilities(strict=False)[1],
+            "runtime_environment": os.getenv("VERCEL_ENV", "local"),
+            "capability_summary": [
+                {"id": "hosted-chat", "label": "Hosted LLM / NIM chat", "enabled": self.hosted_configured, "description": "OpenAI-compatible NVIDIA hosted inference."},
+                {"id": "model-catalog", "label": "NVIDIA model catalog", "enabled": self.hosted_configured, "description": "Lists models exposed by the configured NVIDIA /v1 endpoint."},
+                {"id": "local-nim", "label": "Local/remote NIM", "enabled": self.local_nim_configured, "description": "Self-hosted NVIDIA NIM endpoint."},
+                {"id": "scientific-endpoints", "label": "Scientific NIM endpoints", "enabled": bool(self._custom_capabilities(strict=False)[0]), "description": "Optional BioNeMo or other server-registered scientific capabilities."},
+            ],
             "physics_toolkit": physics_toolkit_manifest(),
         }
 
@@ -258,11 +323,13 @@ class NvidiaProvider:
             prompt = str(payload.get("prompt") or payload.get("user") or "").strip()
             if not prompt:
                 raise ValueError("prompt is required")
+            selected_model = self._validate_hosted_model(str(payload.get("model") or self.text_model))
             text = self.complete(
                 str(payload.get("system") or "You are a scientific assistant. Preserve uncertainty and units."),
                 prompt,
+                model=selected_model,
             )
-            return {"capability": capability, "provider": "nvidia", "model": self.text_model, "output": text}
+            return {"capability": capability, "provider": "nvidia", "model": selected_model, "output": text}
 
         if capability == "local-nim-chat":
             if not self.local_nim_configured:
