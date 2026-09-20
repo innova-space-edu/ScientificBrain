@@ -1,0 +1,11 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: [build, --pull, -f, ${_DOCKERFILE}, -t, ${_IMAGE}, .]
+  - name: gcr.io/cloud-builders/docker
+    args: [push, ${_IMAGE}]
+images: [${_IMAGE}]
+serviceAccount: projects/${PROJECT_ID}/serviceAccounts/scibrain-image-builder@${PROJECT_ID}.iam.gserviceaccount.com
+options:
+  machineType: E2_HIGHCPU_32
+  logging: CLOUD_LOGGING_ONLY
+timeout: 7200s

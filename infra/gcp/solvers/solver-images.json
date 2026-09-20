@@ -1,0 +1,8 @@
+{
+  "warpx": {"tag":"26.09-cuda12.8","source":"BLAST-WarpX/warpx@26.09","runtime":"gpu","batch_machine_type":"g2-standard-8","gpu_type":"nvidia-l4","max_gpus_per_node":1},
+  "picongpu": {"tag":"0.8.0-cuda12.4","source":"ComputationalRadiationPhysics/picongpu@0.8.0","runtime":"gpu","batch_machine_type":"g2-standard-8","gpu_type":"nvidia-l4","max_gpus_per_node":1},
+  "edipic2d": {"tag":"a32863ad-petsc3.14.6","source":"PrincetonUniversity/EDIPIC-2D@a32863ad046eabe170037e9ef3b849b763d25053","runtime":"cpu-mpi","batch_machine_type":"c3-standard-8"},
+  "geant4": {"tag":"11.4.2","source":"Geant4/geant4@v11.4.2","runtime":"cpu","batch_machine_type":"c3-standard-8"},
+  "physicsnemo": {"tag":"26.08","source":"nvcr.io/nvidia/physicsnemo/physicsnemo:26.08","runtime":"gpu","batch_machine_type":"g2-standard-8","gpu_type":"nvidia-l4","max_gpus_per_node":1},
+  "flash": {"tag":"4.8-private","source":"authorized FLASH 4.8 archive; never committed","runtime":"cpu-mpi","batch_machine_type":"c3-standard-22","private_source":true}
+}
