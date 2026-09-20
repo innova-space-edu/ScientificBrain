@@ -69,3 +69,21 @@ def test_wif_requires_vercel_oidc_token(monkeypatch):
     assert auth.available is False
     with pytest.raises(RuntimeError):
         auth.credentials()
+
+
+def test_missing_configuration_names(monkeypatch):
+    for name in [
+        "SCIBRAIN_GCP_PROJECT_NUMBER",
+        "SCIBRAIN_GCP_WIF_POOL_ID",
+        "SCIBRAIN_GCP_WIF_PROVIDER_ID",
+        "SCIBRAIN_GCP_DISPATCHER_SERVICE_ACCOUNT",
+        "VERCEL_OIDC_TOKEN",
+    ]:
+        monkeypatch.delenv(name, raising=False)
+    auth = VercelWorkloadIdentity.from_env()
+    assert set(auth.missing_configuration()) == {
+        "SCIBRAIN_GCP_PROJECT_NUMBER",
+        "SCIBRAIN_GCP_WIF_POOL_ID",
+        "SCIBRAIN_GCP_WIF_PROVIDER_ID",
+        "SCIBRAIN_GCP_DISPATCHER_SERVICE_ACCOUNT",
+    }
