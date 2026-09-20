@@ -98,3 +98,35 @@ def test_status_ignores_invalid_custom_endpoint(monkeypatch):
     assert status["capabilities"] == []
     assert status["configuration_warnings"]
     assert "broken" in status["configuration_warnings"][0]
+
+
+def test_model_catalog_uses_nvidia_models_endpoint(monkeypatch):
+    _clear(monkeypatch)
+    monkeypatch.setenv("NVIDIA_API_KEY", "nvapi-test")
+
+    class Response:
+        def raise_for_status(self):
+            return None
+        def json(self):
+            return {"data": [{"id": "openai/gpt-oss-20b"}, {"id": "meta/llama-3.3-70b-instruct"}]}
+
+    monkeypatch.setattr("scientific_brain.nvidia_provider.httpx.get", lambda *args, **kwargs: Response())
+    result = NvidiaProvider.from_env().models_status()
+    assert result["configured"] is True
+    assert "meta/llama-3.3-70b-instruct" in result["models"]
+    assert result["source"] == "nvidia-v1-models"
+
+
+def test_invoke_can_select_model_from_catalog(monkeypatch):
+    _clear(monkeypatch)
+    monkeypatch.setenv("NVIDIA_API_KEY", "nvapi-test")
+    provider = NvidiaProvider.from_env()
+    monkeypatch.setattr(provider, "models_status", lambda: {"models": ["openai/gpt-oss-20b", "meta/llama-3.3-70b-instruct"]})
+    captured = {}
+    def fake_chat(**kwargs):
+        captured["model"] = kwargs["model"]
+        return "ok"
+    monkeypatch.setattr(provider, "_chat", fake_chat)
+    result = provider.invoke("nvidia-chat", {"prompt": "test", "model": "meta/llama-3.3-70b-instruct"})
+    assert result["model"] == "meta/llama-3.3-70b-instruct"
+    assert captured["model"] == "meta/llama-3.3-70b-instruct"

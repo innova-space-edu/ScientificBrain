@@ -3,152 +3,261 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Herramientas científicas · ScientificBrain</title>
+  <title>Centro científico · ScientificBrain</title>
   <link rel="stylesheet" href="/assets/styles.css"/>
-  <link rel="stylesheet" href="/assets/scientific_tools.css"/>
+  <link rel="stylesheet" href="/assets/scientific_tools.css?v=32-tools"/>
+  <style>
+    html,body{margin:0;height:100%;overflow:hidden}
+    body.science-app{display:block;background:#f6f7fb;color:#172033}
+    .science-sidebar{position:fixed;inset:0 auto 0 0;width:224px;height:100vh;background:#fff;border-right:1px solid #e6e9ef;display:flex;flex-direction:column;z-index:50}
+    .science-content{margin-left:224px;height:100vh;min-width:0;display:flex;flex-direction:column;overflow:hidden}
+    .content-topbar{flex:0 0 68px;min-height:68px;background:#fff;border-bottom:1px solid #e6e9ef}
+    .content-scroll{flex:1;min-height:0;overflow-y:auto}
+    .science-view{display:none}.science-view.active{display:block}
+    .nav-item{appearance:none;border:0!important;background:transparent!important;box-shadow:none!important}
+    @media(max-width:780px){html,body{overflow:auto}.science-sidebar{position:static;width:100%;height:auto}.science-content{margin-left:0;height:auto;min-height:100vh}.content-scroll{overflow:visible}}
+  </style>
 </head>
-<body class="tools-shell">
-  <header class="tools-top">
-    <div class="tools-brand"><div class="mark">SB</div><div><strong>ScientificBrain</strong><div class="muted">Herramientas científicas</div></div></div>
-    <div class="tools-actions"><span id="tools-version" class="badge">v—</span><a class="ghost tools-link" href="/scientific-capabilities">Qué hace ScientificBrain</a><a class="ghost tools-link" href="/">← Volver a ScientificBrain</a></div>
-  </header>
-  <main class="tools-main">
-    <section class="tools-hero">
-      <article class="tools-card">
-        <p class="eyebrow">Scientific compute workspace</p>
-        <h1>Física, simulación y SciML</h1>
-        <p>Router de modelo físico, Monte Carlo, solvers de plasma, transporte de partículas, openPMD, PhysicsNeMo y workers/HPC. Las skills están basadas en código fuente inspeccionado y ScientificBrain mantiene las credenciales fuera del navegador.</p>
-        <div class="future-list" id="implemented-extensions"></div>
-      </article>
-      <article class="tools-card">
-        <h3>Estado de ejecución</h3>
-        <div id="nvidia-status">Comprobando NVIDIA…</div>
-        <div id="worker-status" style="margin-top:12px"></div>
-      </article>
-    </section>
+<body class="science-app">
+  <aside class="science-sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-mark">SB</div>
+      <div><strong>ScientificBrain</strong><small>Centro científico</small></div>
+    </div>
 
-    <section class="tool-grid">
-      <article class="tool-card ready"><span class="tag">39 skills</span><h3>Physics Skills</h3><p>Plasma, FLASH, PIC/hybrid, Monte Carlo, UQ, diagnostics, multi-fidelity y active learning.</p><a class="secondary tools-link" href="https://github.com/innova-space-edu/scientificbrain-physics-skills" target="_blank" rel="noopener">Abrir repositorio ↗</a></article>
-      <article class="tool-card"><span class="tag">Fluid</span><h3>FLASH</h3><p>Ideal/resistive/Hall/Extended-MHD, HDF5/yt y validación.</p><div class="status-warn">Requiere worker con FLASH instalado</div></article>
-      <article class="tool-card"><span class="tag">Hybrid + PIC</span><h3>WarpX</h3><p>Hybrid-PIC, full PIC, MCC/DSMC y openPMD.</p><div class="status-warn">Requiere worker CPU/GPU</div></article>
-      <article class="tool-card"><span class="tag">HPC PIC</span><h3>PIConGPU</h3><p>PIC a gran escala, plugins de validación, colisiones y openPMD.</p><div class="status-warn">Requiere worker GPU/HPC</div></article>
-      <article class="tool-card"><span class="tag">Low-T 2D</span><h3>EDIPIC-2D</h3><p>MPI + PETSc + HYPRE para plasma de baja temperatura 2D.</p><div class="status-warn">Requiere worker MPI</div></article>
-      <article class="tool-card"><span class="tag">Monte Carlo</span><h3>Geant4</h3><p>Transporte de partículas en materia, blindaje, detectores y radiación espacial.</p><div class="status-warn">Requiere worker Geant4</div></article>
-      <article class="tool-card ready"><span class="tag">Local</span><h3>Monte Carlo / UQ</h3><p>Muestreo reproducible de parámetros y propagación de incertidumbre básica desde ScientificBrain.</p><div class="status-good">Disponible sin NVIDIA</div></article>
-      <article class="tool-card"><span class="tag">Data</span><h3>openPMD</h3><p>Capa canónica para campos y partículas de WarpX/PIConGPU; HDF5 y ADIOS2/streaming según backend.</p><div class="status-good">Contrato implementado</div></article>
-      <article class="tool-card"><span class="tag">SciML</span><h3>PhysicsNeMo</h3><p>MHD PINO/FNO, distributed training, UQ y active learning.</p><div id="physicsnemo-state" class="status-warn">Endpoint/runtime por configurar</div></article>
-      <article class="tool-card"><span class="tag">Life sciences</span><h3>BioNeMo</h3><p>Capacidades NVIDIA de biología molecular y química separadas de la física.</p><div id="bionemo-state" class="status-warn">Endpoint por configurar</div></article>
-      <article class="tool-card"><span class="tag">NVIDIA</span><h3>NIM / API Catalog</h3><p>Inferencia alojada y NIMs científicos registrados por el servidor.</p><div id="api-state" class="status-warn">API no comprobada</div></article>
-      <article class="tool-card ready"><span class="tag">Orchestration</span><h3>Multi-fidelity</h3><p>FLASH → Hybrid-PIC → full PIC → surrogate → uncertainty → active learning.</p><div class="status-good">Router definido</div></article>
-    </section>
+    <nav class="science-nav" aria-label="Centro científico">
+      <button class="nav-item active" data-view="overview"><span class="nav-icon">⌂</span><span>Resumen</span></button>
 
-    <section class="tools-card" style="margin-top:22px">
-      <h2>Preparar job científico</h2>
-      <p class="tools-note">Genera un manifiesto reproducible y seguro. No ejecuta comandos y no permite URLs, tokens o ejecutables enviados por el navegador.</p>
-      <div class="input-grid">
-        <label>Solver<select id="job-solver"><option value="flash">FLASH</option><option value="warpx">WarpX</option><option value="picongpu">PIConGPU</option><option value="edipic2d">EDIPIC-2D</option><option value="geant4">Geant4</option><option value="physicsnemo">PhysicsNeMo</option></select></label>
-        <label>Acción<select id="job-action"><option value="run">run</option><option value="validate">validate</option><option value="sweep">sweep</option><option value="analyze">analyze</option><option value="train">train</option><option value="infer">infer</option></select></label>
-        <label>Modelo<input id="job-model" value="hall-mhd"/></label>
-        <label>Artefacto de entrada<input id="job-input" value="campaigns/example/input"/></label>
-        <label>GPU<input id="job-gpus" type="number" value="0" min="0"/></label>
+      <div class="nav-group-title">Análisis</div>
+      <button class="nav-item" data-view="router"><span class="nav-icon">R</span><span>Router físico</span></button>
+      <button class="nav-item" data-view="montecarlo"><span class="nav-icon">MC</span><span>Monte Carlo / UQ</span></button>
+      <button class="nav-item" data-view="nvidia"><span class="nav-icon">NV</span><span>NVIDIA</span><span id="nav-nvidia-dot" class="nav-dot"></span></button>
+
+      <div class="nav-group-title">Simulación</div>
+      <button class="nav-item" data-view="prepare"><span class="nav-icon">J</span><span>Preparar simulación</span></button>
+      <button class="nav-item" data-view="solvers"><span class="nav-icon">Σ</span><span>Simuladores</span></button>
+      <button class="nav-item" data-view="google"><span class="nav-icon">GC</span><span>Google Cloud</span><span id="nav-google-dot" class="nav-dot"></span></button>
+      <button class="nav-item" data-view="results"><span class="nav-icon">↙</span><span>Resultados</span></button>
+
+      <div class="nav-group-title">Sistema</div>
+      <button class="nav-item" data-view="skills"><span class="nav-icon">SK</span><span>Physics Skills</span></button>
+      <button class="nav-item" data-view="diagnostics"><span class="nav-icon">⋯</span><span>Diagnóstico</span></button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <span id="tools-version" class="version-pill">v—</span>
+      <a href="/scientific-capabilities">Qué puede hacer</a>
+      <a href="/">← Volver a ScientificBrain</a>
+    </div>
+  </aside>
+
+  <main class="science-content">
+    <header class="content-topbar">
+      <div>
+        <p id="view-eyebrow" class="eyebrow">Estado general</p>
+        <h1 id="view-title">Resumen científico</h1>
       </div>
-      <label>Parámetros JSON<textarea id="job-parameters">{"dimension":2}</textarea></label>
-      <div class="tools-actions"><button id="prepare-physics-job" class="secondary">Preparar manifiesto</button></div>
-    </section>
+      <button id="refresh-status" class="ghost">Actualizar estado</button>
+    </header>
 
-
-    <section class="tools-card" style="margin-top:22px">
-      <div class="card-head"><div><p class="eyebrow">Google Cloud setup</p><h2>Configuración requerida</h2></div></div>
-      <p>ScientificBrain usa cuatro valores principales para activar Google Cloud. El bootstrap del repositorio crea el bucket privado, Artifact Registry y la cuenta de servicio de los jobs.</p>
-      <div id="gcp-setup-plan" class="capability-list">Comprobando variables…</div>
-      <div class="tools-actions" style="margin-top:12px"><button id="test-gcp-auth" class="secondary">Probar Vercel → Google WIF</button></div>
-      <p class="tools-note">La prueba usa credenciales temporales y no muestra tokens. FLASH también puede ejecutarse en Google Cloud mediante una imagen privada.</p>
-    </section>
-
-    <section class="tools-card" style="margin-top:22px">
-      <div class="card-head"><div><p class="eyebrow">Cloud compute</p><h2>Google Cloud Batch / Compute Engine</h2></div><a class="ghost tools-link" href="/scientific-capabilities">Qué puede generar ScientificBrain →</a></div>
-      <p>ScientificBrain puede traducir un Physics Job validado a Google Cloud Batch. Batch aprovisiona la VM CPU/GPU, ejecuta una imagen de solver aprobada y deja resultados en Cloud Storage/Cloud Logging.</p>
-      <div id="gcp-status" class="capability-list">Comprobando Google Cloud…</div>
-      <div class="tools-actions" style="margin-top:12px"><button id="preview-gcp-job" class="secondary">Previsualizar Google Batch</button><button id="submit-gcp-job" class="primary">Enviar a Google Cloud</button></div>
-      <p class="tools-note">Para enviar de verdad se deben configurar proyecto, bucket, perfiles de máquina/imagen y autenticación del servidor. La NVIDIA_API_KEY no es necesaria para Google Cloud Batch.</p>
-    </section>
-
-    <section class="tools-card" style="margin-top:22px">
-      <div class="card-head"><div><p class="eyebrow">Results ingestion</p><h2>Recuperar resultados de Google Cloud</h2></div></div>
-      <p>Cuando el solver termina, su contenedor escribe <code>scientificbrain-output.json</code> y los archivos nativos bajo el prefijo exclusivo del job. ScientificBrain puede listar ese prefijo y recuperar el manifiesto sin exponer acceso arbitrario al bucket.</p>
-      <div class="input-grid two-cols">
-        <label>ScientificBrain job ID<input id="result-job-id" placeholder="UUID del job científico"/></label>
-        <div class="tools-actions" style="align-self:end">
-          <button id="list-gcp-outputs" class="secondary">Listar archivos</button>
-          <button id="get-gcp-manifest" class="secondary">Leer manifiesto</button>
+    <div class="content-scroll">
+      <section class="science-view active" data-view-panel="overview">
+        <div class="overview-hero">
+          <div>
+            <h2>Simulación, datos e IA científica</h2>
+            <p>ScientificBrain selecciona el modelo físico, prepara simulaciones reproducibles y conecta resultados con validación, incertidumbre y PhysicsNeMo.</p>
+          </div>
+          <div class="milestone-card">
+            <small>Siguiente hito</small>
+            <strong id="next-milestone">Comprobando configuración…</strong>
+            <span id="next-milestone-detail">—</span>
+          </div>
         </div>
-      </div>
-      <p class="tools-note">El ID se completa automáticamente al preparar un job en esta sesión. Los endpoints solo acceden a <code>scientificbrain/jobs/&lt;job_id&gt;/</code>.</p>
-    </section>
 
-    <section class="tools-card" style="margin-top:22px">
-      <h2>Router físico de plasma</h2>
-      <p class="tools-note">Calcula escalas de Debye, skin depths, gyro-radii, beta y Alfvén Mach para proponer una jerarquía de modelos. Es un screening: no reemplaza validación física.</p>
-      <div class="input-grid">
-        <label>nₑ [m⁻³]<input id="r-ne" type="number" value="1e20"/></label>
-        <label>B [T]<input id="r-B" type="number" value="0.2" step="any"/></label>
-        <label>Tₑ [eV]<input id="r-Te" type="number" value="10" step="any"/></label>
-        <label>Tᵢ [eV]<input id="r-Ti" type="number" value="2" step="any"/></label>
-        <label>L [m]<input id="r-L" type="number" value="0.01" step="any"/></label>
-        <label>U [m/s]<input id="r-U" type="number" value="50000" step="any"/></label>
-        <label>A<input id="r-A" type="number" value="1" step="any"/></label>
-        <label>Z<input id="r-Z" type="number" value="1" step="any"/></label>
-        <label>λmfp [m] opcional<input id="r-mfp" type="number" step="any"/></label>
-      </div>
-      <div class="tools-actions check-row">
-        <label><input id="r-electron" type="checkbox"/> requiere cinética electrónica</label>
-        <label><input id="r-lowt" type="checkbox"/> plasma low-T 2D</label>
-        <label><input id="r-matter" type="checkbox"/> partículas atravesando materia</label>
-        <button id="run-physics-router" class="primary">Evaluar modelos</button>
-      </div>
-    </section>
-
-    <section class="tools-hero" style="margin-top:22px">
-      <article class="tools-card">
-        <h2>Monte Carlo de parámetros</h2>
-        <div class="tools-form">
-          <label>Distribuciones JSON<textarea id="mc-spec">{"B":{"dist":"normal","mean":2.0,"sd":0.1},"Te":{"dist":"uniform","low":8,"high":12}}</textarea></label>
-          <div class="input-grid two-cols"><label>N<input id="mc-n" type="number" value="100" min="1" max="5000"/></label><label>Seed<input id="mc-seed" type="number" value="42"/></label></div>
-          <button id="run-monte-carlo" class="primary">Generar muestras</button>
-          <p class="tools-note">Primera versión: variables escalares independientes. Las correlaciones se añadirán con un sampler explícito.</p>
+        <div class="summary-grid">
+          <article class="summary-card"><small>ScientificBrain</small><strong class="summary-state good">Operativo</strong><span>Router, Monte Carlo y jobs científicos</span></article>
+          <article class="summary-card"><small>NVIDIA</small><strong id="summary-nvidia" class="summary-state">Comprobando…</strong><span id="summary-nvidia-detail">API / NIM</span></article>
+          <article class="summary-card"><small>Google Cloud</small><strong id="summary-google" class="summary-state">Comprobando…</strong><span id="summary-google-detail">Batch / WIF</span></article>
+          <article class="summary-card"><small>Ejecución cloud</small><strong id="summary-execution" class="summary-state">Comprobando…</strong><span id="summary-execution-detail">Perfiles de solver</span></article>
         </div>
-      </article>
-      <article class="tools-card">
-        <h2>Workers de simulación</h2>
-        <div id="workers-list" class="capability-list">Sin workers configurados.</div>
-        <p class="tools-note">Los workers se registran solo en el servidor. Aquí nunca se introduce una URL o token de cómputo.</p>
-      </article>
-    </section>
 
-    <section class="tools-hero" style="margin-top:22px">
-      <article class="tools-card">
-        <h2>Probar NVIDIA API</h2>
-        <div class="tools-form">
-          <label>Consulta científica<textarea id="nvidia-prompt">Explica qué comparación mínima harías entre Hall-MHD y Hybrid-PIC para validar un shock magnetizado.</textarea></label>
-          <button id="run-nvidia-chat" class="primary">Ejecutar NVIDIA</button>
-          <p class="tools-note">Se habilitará cuando NVIDIA_API_KEY esté disponible.</p>
+        <div class="panel-card">
+          <div class="panel-heading"><div><p class="eyebrow">Disponibles ahora</p><h2>Herramientas listas</h2></div></div>
+          <div class="quick-grid">
+            <button class="quick-card" data-nav-target="router"><strong>Router físico</strong><span>Escalas y selección de modelo</span></button>
+            <button class="quick-card" data-nav-target="montecarlo"><strong>Monte Carlo / UQ</strong><span>Muestreo e incertidumbre</span></button>
+            <button class="quick-card" data-nav-target="nvidia"><strong>NVIDIA</strong><span>Razonamiento científico y NIM</span></button>
+            <button class="quick-card" data-nav-target="prepare"><strong>Preparar simulación</strong><span>Physics Job reproducible</span></button>
+          </div>
         </div>
-      </article>
-      <article class="tools-card">
-        <h2>Capacidad NVIDIA/NIM configurada</h2>
-        <div class="tools-form">
-          <label>Capacidad<select id="capability-select"><option value="">Sin capacidades configuradas</option></select></label>
-          <label>Entrada JSON<textarea id="capability-input">{}</textarea></label>
-          <button id="run-capability" class="secondary">Ejecutar capacidad</button>
-        </div>
-      </article>
-    </section>
 
-    <section class="tools-card" style="margin-top:22px">
-      <div class="card-head"><h2>Salida científica</h2><button id="clear-tools-output" class="ghost">Limpiar</button></div>
-      <pre id="tools-output" class="tools-output">ScientificBrain Physics Tools listo.</pre>
-    </section>
+        <div class="panel-card">
+          <div class="panel-heading"><div><p class="eyebrow">Flujo</p><h2>Cómo trabaja ScientificBrain</h2></div></div>
+          <div class="pipeline">
+            <span><b>1</b> Pregunta</span><i>→</i><span><b>2</b> Router físico</span><i>→</i><span><b>3</b> Solver</span><i>→</i><span><b>4</b> Google / worker</span><i>→</i><span><b>5</b> Datos</span><i>→</i><span><b>6</b> Validación / UQ</span><i>→</i><span><b>7</b> PhysicsNeMo</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="science-view" data-view-panel="router">
+        <div class="panel-card">
+          <div class="panel-heading"><div><p class="eyebrow">Análisis de régimen</p><h2>Router físico de plasma</h2></div><span class="state-pill good">Disponible</span></div>
+          <p class="panel-copy">Calcula escalas de Debye, skin depths, gyro-radii, beta y Mach de Alfvén para proponer una jerarquía de modelos. Es una herramienta de screening; la validez final depende de convergencia, cierres y comparación entre modelos.</p>
+          <div class="input-grid">
+            <label>nₑ [m⁻³]<input id="r-ne" type="number" value="1e20"/></label>
+            <label>B [T]<input id="r-B" type="number" value="0.2" step="any"/></label>
+            <label>Tₑ [eV]<input id="r-Te" type="number" value="10" step="any"/></label>
+            <label>Tᵢ [eV]<input id="r-Ti" type="number" value="2" step="any"/></label>
+            <label>L [m]<input id="r-L" type="number" value="0.01" step="any"/></label>
+            <label>U [m/s]<input id="r-U" type="number" value="50000" step="any"/></label>
+            <label>A<input id="r-A" type="number" value="1" step="any"/></label>
+            <label>Z<input id="r-Z" type="number" value="1" step="any"/></label>
+            <label>λmfp [m] opcional<input id="r-mfp" type="number" step="any"/></label>
+          </div>
+          <div class="tools-actions check-row">
+            <label><input id="r-electron" type="checkbox"/> requiere cinética electrónica</label>
+            <label><input id="r-lowt" type="checkbox"/> plasma low-T 2D</label>
+            <label><input id="r-matter" type="checkbox"/> partículas atravesando materia</label>
+          </div>
+          <button id="run-physics-router" class="primary">Evaluar modelos</button>
+        </div>
+      </section>
+
+      <section class="science-view" data-view-panel="montecarlo">
+        <div class="panel-card">
+          <div class="panel-heading"><div><p class="eyebrow">Incertidumbre</p><h2>Monte Carlo / UQ</h2></div><span class="state-pill good">Disponible</span></div>
+          <p class="panel-copy">Genera muestras reproducibles de parámetros para campañas numéricas e incertidumbre. La primera versión usa variables escalares independientes.</p>
+          <div class="mc-builder">
+            <div class="mc-toolbar"><div><strong>Variables aleatorias</strong><span>Agrega las variables del caso y elige su distribución.</span></div><button id="mc-add-variable" class="secondary" type="button">+ Agregar variable</button></div>
+            <div id="mc-variables" class="mc-variables"></div>
+            <div class="input-grid two-cols"><label>Número de muestras<input id="mc-n" type="number" value="100" min="1" max="5000"/></label><label>Seed reproducible<input id="mc-seed" type="number" value="42"/></label></div>
+            <details class="advanced-inline"><summary>JSON avanzado</summary><label class="check-inline"><input id="mc-use-json" type="checkbox"/> Usar este JSON en lugar del constructor visual</label><textarea id="mc-spec">{"B":{"dist":"normal","mean":2.0,"sd":0.1},"Te":{"dist":"uniform","low":8,"high":12}}</textarea><button id="mc-sync-json" class="ghost" type="button">Actualizar JSON desde el constructor</button></details>
+            <button id="run-monte-carlo" class="primary">Generar muestras</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="science-view" data-view-panel="nvidia">
+        <div class="panel-card">
+          <div class="panel-heading"><div><p class="eyebrow">IA científica</p><h2>NVIDIA</h2></div><span id="nvidia-view-state" class="state-pill">Comprobando</span></div>
+          <p class="panel-copy">La API NVIDIA es una capa de inferencia distinta de las GPU usadas para simulaciones. Aquí puedes elegir el modelo alojado disponible; PhysicsNeMo sigue apareciendo como motor científico en Simuladores.</p>
+          <div id="nvidia-runtime-note" class="context-note"></div>
+          <div id="nvidia-capability-cards" class="capability-grid"></div>
+          <div class="split-grid">
+            <div class="form-stack">
+              <h3>Consulta científica</h3>
+              <label>Modelo NVIDIA<select id="nvidia-model-select"><option value="">Comprobando modelos…</option></select></label>
+              <label>Consulta<textarea id="nvidia-prompt">Explica qué comparación mínima harías entre Hall-MHD y Hybrid-PIC para validar un shock magnetizado.</textarea></label>
+              <button id="run-nvidia-chat" class="primary">Ejecutar NVIDIA</button>
+            </div>
+            <div class="form-stack">
+              <h3>Endpoints científicos opcionales</h3>
+              <p class="mini-copy">BioNeMo u otros NIM especializados aparecen aquí solo cuando su endpoint se registra en el servidor. No son necesarios para usar el chat NVIDIA.</p>
+              <label>Endpoint registrado<select id="capability-select"><option value="">Sin endpoints científicos adicionales</option></select></label>
+              <label>Entrada JSON<textarea id="capability-input">{}</textarea></label>
+              <button id="run-capability" class="secondary">Ejecutar endpoint</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="science-view" data-view-panel="prepare">
+        <div class="panel-card">
+          <div class="panel-heading"><div><p class="eyebrow">Physics Job</p><h2>Preparar simulación</h2></div><span class="state-pill good">Disponible</span></div>
+          <p class="panel-copy">Crea un manifiesto validado para un solver. Preparar el job funciona ahora; enviarlo a Google Cloud se habilita cuando exista el perfil de ejecución de ese solver.</p>
+          <div class="input-grid">
+            <label>Solver<select id="job-solver"><option value="flash">FLASH</option><option value="warpx">WarpX</option><option value="picongpu">PIConGPU</option><option value="edipic2d">EDIPIC-2D</option><option value="geant4">Geant4</option><option value="physicsnemo">PhysicsNeMo</option></select></label>
+            <label>Acción<select id="job-action"><option value="run">run</option><option value="validate">validate</option><option value="sweep">sweep</option><option value="analyze">analyze</option><option value="train">train</option><option value="infer">infer</option></select></label>
+            <label>Modelo / configuración<select id="job-model"><option value="hall-mhd">Hall MHD</option></select><small id="job-model-help" class="field-help"></small></label>
+            <label>Artefacto<input id="job-input" value="campaigns/example/input"/></label>
+            <label>GPU<input id="job-gpus" type="number" value="0" min="0"/></label>
+          </div>
+          <label class="block-label">Parámetros JSON<textarea id="job-parameters">{"dimension":2}</textarea></label>
+          <div class="tools-actions">
+            <button id="prepare-physics-job" class="secondary">Preparar manifiesto</button>
+            <button id="preview-gcp-job" class="secondary">Previsualizar Google Batch</button>
+            <button id="submit-gcp-job" class="primary">Enviar a Google Cloud</button>
+          </div>
+          <p id="job-cloud-note" class="inline-note"></p>
+        </div>
+      </section>
+
+      <section class="science-view" data-view-panel="solvers">
+        <div class="panel-card">
+          <div class="panel-heading"><div><p class="eyebrow">Motores</p><h2>Simuladores y entrenamiento</h2></div></div>
+          <p class="panel-copy">Las skills conocen varios modelos/configuraciones por motor. El indicador cloud es independiente: muestra si además existe una imagen/perfil para ejecutarlo en Google Batch.</p>
+          <div class="solver-grid">
+            <article class="solver-card" data-solver="flash"><div class="solver-head"><strong>FLASH</strong><span class="solver-status">Comprobando</span></div><p>MHD, resistivo, Hall y Extended-MHD.</p><small>CPU / MPI · HDF5 / yt</small><div class="solver-models"></div></article>
+            <article class="solver-card" data-solver="warpx"><div class="solver-head"><strong>WarpX</strong><span class="solver-status">Comprobando</span></div><p>Hybrid-PIC, full PIC, MCC y DSMC.</p><small>NVIDIA GPU · openPMD</small><div class="solver-models"></div></article>
+            <article class="solver-card" data-solver="picongpu"><div class="solver-head"><strong>PIConGPU</strong><span class="solver-status">Comprobando</span></div><p>PIC cinético GPU/HPC a gran escala.</p><small>NVIDIA GPU / multi-node · openPMD</small><div class="solver-models"></div></article>
+            <article class="solver-card" data-solver="edipic2d"><div class="solver-head"><strong>EDIPIC-2D</strong><span class="solver-status">Comprobando</span></div><p>Plasma de baja temperatura en 2D.</p><small>CPU / MPI · PETSc / HYPRE</small><div class="solver-models"></div></article>
+            <article class="solver-card" data-solver="geant4"><div class="solver-head"><strong>Geant4</strong><span class="solver-status">Comprobando</span></div><p>Monte Carlo de partículas y radiación en materia.</p><small>CPU · scoring</small><div class="solver-models"></div></article>
+            <article class="solver-card" data-solver="physicsnemo"><div class="solver-head"><strong>PhysicsNeMo</strong><span class="solver-status">Comprobando</span></div><p>FNO/PINO, surrogate, distributed training y active learning.</p><small>NVIDIA GPU · SciML</small><div class="solver-models"></div></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="science-view" data-view-panel="google">
+        <div class="panel-card">
+          <div class="panel-heading"><div><p class="eyebrow">Cloud compute</p><h2>Google Cloud</h2></div><span id="google-view-state" class="state-pill">Comprobando</span></div>
+          <p class="panel-copy">Aquí se concentra únicamente lo necesario para pasar de ScientificBrain a Google Batch y Compute Engine. Preview y Production son identidades OIDC distintas y se verifican por separado.</p><div id="gcp-env-note" class="context-note"></div>
+          <div id="setup-steps" class="setup-steps"></div>
+          <div class="tools-actions"><button id="test-gcp-auth" class="secondary">Probar Vercel → Google WIF</button></div>
+        </div>
+
+        <div class="panel-card">
+          <div class="panel-heading"><div><p class="eyebrow">Estado técnico</p><h2>Batch y perfiles</h2></div></div>
+          <div id="gcp-status" class="status-list"></div>
+          <div id="gcp-setup-plan" class="status-list compact"></div>
+        </div>
+      </section>
+
+      <section class="science-view" data-view-panel="results">
+        <div class="panel-card">
+          <div class="panel-heading"><div><p class="eyebrow">Ingesta</p><h2>Resultados de simulación</h2></div></div>
+          <p class="panel-copy">Recupera el manifiesto y archivos generados por un job ya ejecutado. ScientificBrain limita la consulta al prefijo del job.</p>
+          <div class="input-grid two-cols">
+            <label>ScientificBrain job ID<input id="result-job-id" placeholder="UUID del job científico"/></label>
+            <label>Google Batch job ID<input id="result-batch-job-id" placeholder="scibrain-flash-…"/></label>
+            <div class="tools-actions align-end"><button id="get-gcp-job-status" class="secondary">Consultar avance</button><button id="list-gcp-outputs" class="secondary">Listar archivos</button><button id="get-gcp-manifest" class="secondary">Leer manifiesto</button></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="science-view" data-view-panel="skills">
+        <div class="panel-card">
+          <div class="panel-heading"><div><p class="eyebrow">Toolkit</p><h2>ScientificBrain Physics Skills</h2></div><a class="secondary tools-link" href="https://github.com/innova-space-edu/scientificbrain-physics-skills" target="_blank" rel="noopener">Abrir GitHub ↗</a></div>
+          <p class="panel-copy">La capa científica define routing, solver, diagnósticos, validación, Monte Carlo/UQ, multi-fidelity y active learning. No es el hardware de ejecución.</p>
+          <div id="implemented-extensions" class="skill-chip-grid"></div>
+        </div>
+        <div class="panel-card">
+          <div class="panel-heading"><div><p class="eyebrow">Workers</p><h2>Cómputo externo</h2></div></div>
+          <div id="worker-status" class="status-list"></div>
+          <div id="workers-list" class="workers-grid"></div>
+        </div>
+      </section>
+
+      <section class="science-view" data-view-panel="diagnostics">
+        <div class="panel-card">
+          <div class="panel-heading"><div><p class="eyebrow">Avanzado</p><h2>Diagnóstico de proveedores</h2></div></div>
+          <p class="panel-copy">Detalles técnicos para depuración. No son necesarios para el uso normal.</p>
+          <div class="diagnostic-grid">
+            <article><h3>NVIDIA</h3><div id="nvidia-status" class="status-list"></div><div id="nvidia-warnings" class="diagnostic-note"></div></article>
+            <article><h3>Errores de carga</h3><div id="load-errors" class="diagnostic-note">Sin errores.</div></article>
+          </div>
+        </div>
+      </section>
+
+      <section id="result-card" class="result-card" hidden>
+        <div class="result-head">
+          <div><p class="eyebrow">Resultado</p><h2 id="result-title">Salida científica</h2></div>
+          <div class="tools-actions"><button id="clear-tools-output" class="ghost">Limpiar</button><button id="close-result" class="ghost">Cerrar</button></div>
+        </div>
+        <pre id="tools-output" class="tools-output"></pre>
+      </section>
+    </div>
   </main>
-  <script src="/assets/scientific_tools.js"></script>
+
+  <script src="/assets/scientific_tools.js?v=32-tools"></script>
 </body>
 </html>

@@ -4,6 +4,8 @@ import json
 import os
 from typing import Any
 
+from .google_wif import vercel_wif_from_env
+
 
 def google_cloud_setup_plan() -> dict[str, Any]:
     project_id = os.getenv("SCIBRAIN_GCP_PROJECT_ID", "").strip()
@@ -44,18 +46,20 @@ def google_cloud_setup_plan() -> dict[str, Any]:
             "description": "Server-only solver to private image and machine/GPU mapping.",
         },
     ]
+    wif = vercel_wif_from_env()
     wif_fields = {
-        "project_number": bool(os.getenv("SCIBRAIN_GCP_PROJECT_NUMBER", "").strip()),
-        "pool_id": bool(os.getenv("SCIBRAIN_GCP_WIF_POOL_ID", "").strip()),
-        "provider_id": bool(os.getenv("SCIBRAIN_GCP_WIF_PROVIDER_ID", "").strip()),
-        "dispatcher_service_account": bool(
-            os.getenv("SCIBRAIN_GCP_DISPATCHER_SERVICE_ACCOUNT", "").strip()
-        ),
-        "vercel_oidc_token": bool(os.getenv("VERCEL_OIDC_TOKEN", "").strip()),
+        "project_number": bool(wif.project_number),
+        "pool_id": bool(wif.pool_id),
+        "provider_id": bool(wif.provider_id),
+        "dispatcher_service_account": bool(wif.dispatcher_service_account),
+        "vercel_oidc_token": bool(wif.subject_token),
     }
+
+    runtime_environment = os.getenv("VERCEL_ENV", "local").strip() or "local"
 
     return {
         "region": region,
+        "runtime_environment": runtime_environment,
         "ready": all(item["configured"] for item in variables),
         "variables": variables,
         "profiles_valid_json": profiles_valid,
@@ -72,10 +76,11 @@ def google_cloud_setup_plan() -> dict[str, Any]:
             ),
             "available": all(wif_fields.values()),
             "fields": wif_fields,
+            "token_source": wif.subject_token_source,
             "expected_vercel_subject": (
                 f"owner:{os.getenv('SCIBRAIN_VERCEL_TEAM', '').strip()}:"
                 f"project:{os.getenv('SCIBRAIN_VERCEL_PROJECT', '').strip()}:"
-                "environment:production"
+                f"environment:{runtime_environment}"
                 if os.getenv("SCIBRAIN_VERCEL_TEAM", "").strip()
                 and os.getenv("SCIBRAIN_VERCEL_PROJECT", "").strip()
                 else None
@@ -87,6 +92,11 @@ def google_cloud_setup_plan() -> dict[str, Any]:
             ),
             "job_service_account_name": "scibrain-batch-job",
         },
+        "preview_note": (
+            "Preview deployments need the same non-secret SCIBRAIN_GCP_* variables assigned to the Preview environment, and Google WIF must authorize the preview subject separately."
+            if runtime_environment == "preview"
+            else None
+        ),
         "notes": [
             "FLASH can run on Google Cloud Batch using a private image built from an authorized source checkout.",
             "FLASH source and FLASH container images must not be redistributed publicly.",

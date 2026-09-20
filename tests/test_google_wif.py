@@ -1,3 +1,7 @@
+import sys
+import types
+from types import SimpleNamespace
+
 import pytest
 
 from scientific_brain.google_wif import VercelWorkloadIdentity
@@ -87,3 +91,21 @@ def test_missing_configuration_names(monkeypatch):
         "SCIBRAIN_GCP_WIF_PROVIDER_ID",
         "SCIBRAIN_GCP_DISPATCHER_SERVICE_ACCOUNT",
     }
+
+
+def test_wif_reads_token_from_vercel_functions_get_env(monkeypatch):
+    _configure(monkeypatch)
+    monkeypatch.delenv("VERCEL_OIDC_TOKEN", raising=False)
+
+    vercel_module = types.ModuleType("vercel")
+    functions_module = types.ModuleType("vercel.functions")
+    functions_module.get_env = lambda: SimpleNamespace(
+        VERCEL_OIDC_TOKEN="context.header.payload.signature"
+    )
+    monkeypatch.setitem(sys.modules, "vercel", vercel_module)
+    monkeypatch.setitem(sys.modules, "vercel.functions", functions_module)
+
+    auth = VercelWorkloadIdentity.from_env()
+    assert auth.available is True
+    assert auth.subject_token_source == "vercel.functions.get_env"
+    assert "context.header.payload.signature" not in str(auth.public_status())

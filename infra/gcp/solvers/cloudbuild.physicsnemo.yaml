@@ -1,0 +1,46 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
+    secretEnv:
+      - 'NGC_API_KEY'
+    args:
+      - '-ceu'
+      - |
+        mkdir -p /workspace/.docker
+        printf '%s' "$$NGC_API_KEY" | docker --config /workspace/.docker login nvcr.io --username '$oauthtoken' --password-stdin
+
+  - name: 'gcr.io/cloud-builders/docker'
+    env:
+      - 'DOCKER_CONFIG=/workspace/.docker'
+    args:
+      - 'build'
+      - '--pull'
+      - '-f'
+      - 'physicsnemo/Dockerfile'
+      - '-t'
+      - '${_IMAGE}'
+      - '.'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    env:
+      - 'DOCKER_CONFIG=/workspace/.docker'
+    args:
+      - 'push'
+      - '${_IMAGE}'
+
+images:
+  - '${_IMAGE}'
+
+serviceAccount: '${_BUILDER_SA}'
+
+availableSecrets:
+  secretManager:
+    - versionName: 'projects/$PROJECT_ID/secrets/scibrain-ngc-api-key/versions/latest'
+      env: 'NGC_API_KEY'
+
+options:
+  machineType: 'E2_HIGHCPU_32'
+  logging: 'CLOUD_LOGGING_ONLY'
+  dynamicSubstitutions: true
+
+timeout: '7200s'

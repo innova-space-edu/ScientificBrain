@@ -472,6 +472,35 @@ On Vercel, Google authentication no longer silently falls back to Application De
 
 Google Batch preview is disabled until at least one solver execution profile exists.
 
+## Scientific Tools sidebar workspace — v0.31
+
+The Scientific Tools interface now uses a fixed navigation sidebar with one focused workspace visible at a time:
+
+- Summary;
+- Physics Router;
+- Monte Carlo / UQ;
+- NVIDIA;
+- Prepare Simulation;
+- Solvers;
+- Google Cloud;
+- Results;
+- Physics Skills;
+- Diagnostics.
+
+Provider warnings and raw technical output are no longer mixed into the normal workflow. Google Cloud setup is isolated in its own view, simulator cards distinguish scientific readiness from cloud-image readiness, and result JSON is shown only when a tool is executed.
+
+Vercel OIDC retrieval also checks both the standard `VERCEL_OIDC_TOKEN` runtime variable and the Python `vercel.functions.get_env()` system-environment accessor before reporting a missing token.
+
+## Scientific model catalog and visual UQ builder — v0.32
+
+Scientific Tools now exposes a solver-aware model catalog instead of a single free-text model field. FLASH, WarpX, PIConGPU, EDIPIC-2D, Geant4 and PhysicsNeMo each expose supported ScientificBrain execution presets. The selected model remains coupled to a versioned solver input artifact for the complete numerical setup.
+
+Monte Carlo/UQ no longer requires hand-written JSON for normal use. A visual variable builder supports normal, uniform, lognormal, triangular and fixed distributions; the JSON representation remains available as an advanced mode.
+
+The NVIDIA workspace now separates API availability, active/available hosted models, local NIM and optional registered scientific endpoints. It queries the OpenAI-compatible `/v1/models` endpoint when available and keeps the configured default model as a safe fallback.
+
+Preview/Production Google WIF state is also environment-aware so a Preview clearly reports when its own Vercel variables or OIDC subject authorization are missing.
+
 ## Development
 
 ```bash
