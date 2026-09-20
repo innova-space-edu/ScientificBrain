@@ -195,3 +195,42 @@ def test_invalid_scientific_job_id_is_rejected(monkeypatch):
     _configured(monkeypatch)
     with pytest.raises(ValueError):
         GoogleCloudBatch.from_env().list_outputs("../../etc/passwd")
+
+
+def test_vercel_with_configured_wif_but_missing_oidc_never_falls_back_to_adc(monkeypatch):
+    _configured(monkeypatch)
+    monkeypatch.setenv("VERCEL", "1")
+    monkeypatch.setenv("SCIBRAIN_GCP_PROJECT_NUMBER", "260133939682")
+    monkeypatch.setenv("SCIBRAIN_GCP_WIF_POOL_ID", "vercel")
+    monkeypatch.setenv("SCIBRAIN_GCP_WIF_PROVIDER_ID", "scientificbrain")
+    monkeypatch.setenv(
+        "SCIBRAIN_GCP_DISPATCHER_SERVICE_ACCOUNT",
+        "scibrain-vercel-dispatcher@scientificbrain-compute.iam.gserviceaccount.com",
+    )
+    monkeypatch.delenv("VERCEL_OIDC_TOKEN", raising=False)
+
+    def forbidden_adc(*args, **kwargs):
+        raise AssertionError("ADC must not be attempted on Vercel when WIF is configured")
+
+    monkeypatch.setattr("scientific_brain.google_batch.google.auth.default", forbidden_adc)
+    probe = GoogleCloudBatch.from_env().auth_probe()
+    assert probe["authenticated"] is False
+    assert probe["auth_mode"] == "vercel_oidc_wif_missing_token"
+    assert "VERCEL_OIDC_TOKEN" in probe["detail"]
+
+
+def test_vercel_missing_wif_config_reports_variables(monkeypatch):
+    _configured(monkeypatch)
+    monkeypatch.setenv("VERCEL", "1")
+    for name in [
+        "SCIBRAIN_GCP_PROJECT_NUMBER",
+        "SCIBRAIN_GCP_WIF_POOL_ID",
+        "SCIBRAIN_GCP_WIF_PROVIDER_ID",
+        "SCIBRAIN_GCP_DISPATCHER_SERVICE_ACCOUNT",
+        "VERCEL_OIDC_TOKEN",
+    ]:
+        monkeypatch.delenv(name, raising=False)
+    probe = GoogleCloudBatch.from_env().auth_probe()
+    assert probe["authenticated"] is False
+    assert probe["auth_mode"] == "vercel_oidc_wif_not_configured"
+    assert "SCIBRAIN_GCP_PROJECT_NUMBER" in probe["detail"]
