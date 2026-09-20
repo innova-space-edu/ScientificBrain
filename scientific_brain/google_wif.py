@@ -20,10 +20,44 @@ _REQUESTED_TOKEN_TYPE = "urn:ietf:params:oauth:token-type:access_token"
 _CACHE: dict[str, tuple[str, float]] = {}
 
 
-def _read_vercel_oidc_token() -> tuple[str, str | None]:
+def register_vercel_request_headers(headers: Any) -> str:
+    """Register the current Vercel request headers for SDK OIDC lookup.
+
+    Vercel's Python SDK prefers the short-lived x-vercel-oidc-token request
+    header and falls back to VERCEL_OIDC_TOKEN. Only a non-sensitive status
+    string is returned.
+    """
+    try:
+        from vercel.headers import set_headers  # type: ignore
+    except ImportError:
+        return "sdk_unavailable"
+
+    try:
+        set_headers(headers)
+        return "registered"
+    except Exception as exc:
+        return f"register_failed:{type(exc).__name__}"
+
+
+def _read_vercel_oidc_token() -> tuple[str, str | None, str]:
     token = os.getenv("VERCEL_OIDC_TOKEN", "").strip()
     if token:
-        return token, "environment"
+        return token, "environment", "environment"
+
+    resolution: str | None = None
+
+    try:
+        from vercel.oidc import get_vercel_oidc_token  # type: ignore
+
+        token = str(get_vercel_oidc_token() or "").strip()
+        if token:
+            return token, "vercel.oidc.get_vercel_oidc_token", "request_context_or_environment"
+        resolution = "oidc_token_unavailable"
+    except ImportError:
+        resolution = "sdk_unavailable"
+    except Exception as exc:
+        resolution = f"oidc_lookup_failed:{type(exc).__name__}"
+
     try:
         from vercel.functions import get_env  # type: ignore
 
@@ -33,10 +67,17 @@ def _read_vercel_oidc_token() -> tuple[str, str | None]:
         else:
             token = str(getattr(env, "VERCEL_OIDC_TOKEN", "") or "").strip()
         if token:
-            return token, "vercel.functions.get_env"
-    except Exception:
-        pass
-    return "", None
+            return token, "vercel.functions.get_env", "system_environment"
+        if resolution is None:
+            resolution = "token_unavailable"
+    except ImportError:
+        if resolution is None:
+            resolution = "sdk_unavailable"
+    except Exception as exc:
+        if resolution is None:
+            resolution = f"get_env_failed:{type(exc).__name__}"
+
+    return "", None, resolution or "token_unavailable"
 
 
 @dataclass(frozen=True)
@@ -52,11 +93,12 @@ class VercelWorkloadIdentity:
     dispatcher_service_account: str
     subject_token: str
     subject_token_source: str | None = None
+    subject_token_resolution: str = "unknown"
     timeout: float = 20.0
 
     @classmethod
     def from_env(cls) -> "VercelWorkloadIdentity":
-        subject_token, token_source = _read_vercel_oidc_token()
+        subject_token, token_source, token_resolution = _read_vercel_oidc_token()
         return cls(
             project_number=os.getenv("SCIBRAIN_GCP_PROJECT_NUMBER", "").strip(),
             pool_id=os.getenv("SCIBRAIN_GCP_WIF_POOL_ID", "").strip(),
@@ -66,6 +108,7 @@ class VercelWorkloadIdentity:
             ).strip(),
             subject_token=subject_token,
             subject_token_source=token_source,
+            subject_token_resolution=token_resolution,
             timeout=max(5.0, float(os.getenv("SCIBRAIN_GCP_WIF_TIMEOUT_SECONDS", "20"))),
         )
 
@@ -107,6 +150,7 @@ class VercelWorkloadIdentity:
             "configured": self.configured,
             "oidc_token_available": bool(self.subject_token),
             "oidc_token_source": self.subject_token_source,
+            "oidc_token_resolution": self.subject_token_resolution,
             "available": self.available,
             "project_number_configured": bool(self.project_number),
             "pool_id": self.pool_id or None,

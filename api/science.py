@@ -10,6 +10,7 @@ from scientific_brain.graph_service import ScientificGraphService
 from scientific_brain.graph_store import ScientificGraphStore
 from scientific_brain.google_batch import google_batch_from_env
 from scientific_brain.google_setup import google_cloud_setup_plan
+from scientific_brain.google_wif import register_vercel_request_headers
 from scientific_brain.nvidia_provider import nvidia_provider_from_env, physics_toolkit_manifest
 from scientific_brain.persistence import hydrate_memory_from_snapshot
 from scientific_brain.physics_jobs import physics_execution_profiles, physics_model_catalog, prepare_physics_job
@@ -62,6 +63,7 @@ class handler(BaseHTTPRequestHandler):
         )
 
     def do_GET(self):
+        register_vercel_request_headers({str(k): str(v) for k, v in self.headers.items()})
         user = require_user(self)
         if not user:
             return
@@ -147,6 +149,7 @@ class handler(BaseHTTPRequestHandler):
             self._write(500, {"error": type(exc).__name__, "detail": str(exc)})
 
     def do_POST(self):
+        register_vercel_request_headers({str(k): str(v) for k, v in self.headers.items()})
         user = require_user(self)
         if not user:
             return

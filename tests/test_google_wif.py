@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from scientific_brain.google_wif import VercelWorkloadIdentity
+from scientific_brain.google_wif import VercelWorkloadIdentity, register_vercel_request_headers
 
 
 def _configure(monkeypatch):
@@ -23,6 +23,7 @@ def test_wif_status_hides_subject_token(monkeypatch):
     auth = VercelWorkloadIdentity.from_env()
     status = auth.public_status()
     assert status["available"] is True
+    assert status["oidc_token_resolution"] == "environment"
     assert "header.payload.signature" not in str(status)
     assert auth.audience == (
         "//iam.googleapis.com/projects/260133939682/locations/global/"
@@ -109,3 +110,41 @@ def test_wif_reads_token_from_vercel_functions_get_env(monkeypatch):
     assert auth.available is True
     assert auth.subject_token_source == "vercel.functions.get_env"
     assert "context.header.payload.signature" not in str(auth.public_status())
+
+
+def test_wif_reads_token_from_vercel_oidc_request_context(monkeypatch):
+    _configure(monkeypatch)
+    monkeypatch.delenv("VERCEL_OIDC_TOKEN", raising=False)
+
+    vercel_module = types.ModuleType("vercel")
+    oidc_module = types.ModuleType("vercel.oidc")
+    oidc_module.get_vercel_oidc_token = lambda: "request.header.payload.signature"
+    functions_module = types.ModuleType("vercel.functions")
+    functions_module.get_env = lambda: SimpleNamespace(VERCEL_OIDC_TOKEN="")
+
+    monkeypatch.setitem(sys.modules, "vercel", vercel_module)
+    monkeypatch.setitem(sys.modules, "vercel.oidc", oidc_module)
+    monkeypatch.setitem(sys.modules, "vercel.functions", functions_module)
+
+    auth = VercelWorkloadIdentity.from_env()
+    assert auth.available is True
+    assert auth.subject_token_source == "vercel.oidc.get_vercel_oidc_token"
+    assert auth.subject_token_resolution == "request_context_or_environment"
+    assert "request.header.payload.signature" not in str(auth.public_status())
+
+
+def test_register_vercel_request_headers_uses_public_sdk_context(monkeypatch):
+    captured = {}
+    vercel_module = types.ModuleType("vercel")
+    headers_module = types.ModuleType("vercel.headers")
+
+    def fake_set_headers(headers):
+        captured.update(headers)
+
+    headers_module.set_headers = fake_set_headers
+    monkeypatch.setitem(sys.modules, "vercel", vercel_module)
+    monkeypatch.setitem(sys.modules, "vercel.headers", headers_module)
+
+    status = register_vercel_request_headers({"x-vercel-oidc-token": "secret-token"})
+    assert status == "registered"
+    assert captured["x-vercel-oidc-token"] == "secret-token"
