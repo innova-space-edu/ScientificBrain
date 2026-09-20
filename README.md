@@ -462,6 +462,16 @@ An authenticated `gcp_auth_probe` operation verifies the complete Vercel → STS
 
 See `docs/VERCEL_GCP_WIF.md`.
 
+## Provider startup hardening — v0.30
+
+Scientific Tools now loads each provider status independently. An incomplete NVIDIA capability configuration can no longer prevent Google Cloud, physics skills, workers or Monte Carlo tools from loading.
+
+NVIDIA status ignores invalid placeholder capability endpoints and reports non-secret configuration warnings instead.
+
+On Vercel, Google authentication no longer silently falls back to Application Default Credentials. If the Workload Identity variables or `VERCEL_OIDC_TOKEN` are missing, the authenticated WIF probe returns an explicit non-secret diagnostic. ADC remains available for local or Google-hosted development where appropriate.
+
+Google Batch preview is disabled until at least one solver execution profile exists.
+
 ## Development
 
 ```bash

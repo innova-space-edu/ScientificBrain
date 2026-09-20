@@ -123,10 +123,13 @@ class GoogleCloudBatch:
 
     def auth_mode(self) -> str:
         wif = vercel_wif_from_env()
+        on_vercel = os.getenv("VERCEL", "").strip() == "1"
         if wif.available:
             return "vercel_oidc_wif"
         if wif.configured:
-            return "vercel_oidc_wif_pending_token"
+            return "vercel_oidc_wif_missing_token"
+        if on_vercel:
+            return "vercel_oidc_wif_not_configured"
         if os.getenv("SCIBRAIN_GCP_SERVICE_ACCOUNT_JSON", "").strip():
             return "service_account_json"
         if os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "").strip():
@@ -154,8 +157,21 @@ class GoogleCloudBatch:
 
     def _credentials(self):
         wif = vercel_wif_from_env()
+        on_vercel = os.getenv("VERCEL", "").strip() == "1"
         if wif.available:
             return wif.credentials()
+        if wif.configured and on_vercel:
+            raise RuntimeError(
+                "Google WIF is configured but VERCEL_OIDC_TOKEN is unavailable. "
+                "Enable Secure Backend Access with OIDC Federation, ensure Vercel system "
+                "environment variables are exposed, and redeploy production."
+            )
+        if on_vercel and not wif.configured:
+            missing = ", ".join(wif.missing_configuration())
+            raise RuntimeError(
+                "Google WIF is not configured in the Vercel runtime. Missing: "
+                f"{missing}. Add the SCIBRAIN_GCP_WIF_* variables to Production and redeploy."
+            )
 
         raw = os.getenv("SCIBRAIN_GCP_SERVICE_ACCOUNT_JSON", "").strip()
         if raw:
@@ -304,13 +320,23 @@ class GoogleCloudBatch:
         }
 
     def auth_probe(self) -> dict[str, Any]:
-        credentials = self._credentials()
-        return {
-            "provider": "google_cloud",
-            "authenticated": bool(getattr(credentials, "token", "")),
-            "auth_mode": self.auth_mode(),
-            "workload_identity": vercel_wif_from_env().public_status(),
-        }
+        try:
+            credentials = self._credentials()
+            return {
+                "provider": "google_cloud",
+                "authenticated": bool(getattr(credentials, "token", "")),
+                "auth_mode": self.auth_mode(),
+                "workload_identity": vercel_wif_from_env().public_status(),
+            }
+        except Exception as exc:
+            return {
+                "provider": "google_cloud",
+                "authenticated": False,
+                "auth_mode": self.auth_mode(),
+                "workload_identity": vercel_wif_from_env().public_status(),
+                "error": type(exc).__name__,
+                "detail": str(exc),
+            }
 
     def submit(self, payload: dict[str, Any]) -> dict[str, Any]:
         if not self.configured:

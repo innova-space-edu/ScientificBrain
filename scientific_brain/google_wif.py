@@ -60,6 +60,18 @@ class VercelWorkloadIdentity:
     def available(self) -> bool:
         return bool(self.configured and self.subject_token)
 
+    def missing_configuration(self) -> list[str]:
+        missing: list[str] = []
+        if not self.project_number:
+            missing.append("SCIBRAIN_GCP_PROJECT_NUMBER")
+        if not self.pool_id:
+            missing.append("SCIBRAIN_GCP_WIF_POOL_ID")
+        if not self.provider_id:
+            missing.append("SCIBRAIN_GCP_WIF_PROVIDER_ID")
+        if not self.dispatcher_service_account:
+            missing.append("SCIBRAIN_GCP_DISPATCHER_SERVICE_ACCOUNT")
+        return missing
+
     @property
     def audience(self) -> str:
         return (
@@ -80,6 +92,7 @@ class VercelWorkloadIdentity:
                 self.dispatcher_service_account
             ),
             "credential_type": "short_lived_wif",
+            "missing_configuration": self.missing_configuration(),
         }
 
     def _cache_key(self) -> str:

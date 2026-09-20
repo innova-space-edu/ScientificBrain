@@ -25,14 +25,32 @@
     $('#gcp-setup-plan').innerHTML=setupVars.map(v=>'<div class="status-row"><span>'+v.name+'</span><strong class="'+(v.configured?'status-good':'status-warn')+'">'+(v.configured?'Configurado':'Pendiente')+'</strong></div>').join('')+'<div class="status-row"><span>Vercel OIDC / WIF</span><strong class="'+(wif.available?'status-good':'status-warn')+'">'+(wif.available?'Disponible':(wif.configured?'Configurado · esperando token':'Pendiente'))+'</strong></div><div class="status-row"><span>FLASH privado en Google</span><strong class="status-good">Soportado</strong></div>';
     const g=state.gcp||{}; const profiles=g.profiles||[];
     $('#gcp-status').innerHTML='<div class="status-row"><span>Integración</span><strong class="'+(g.configured?'status-good':'status-warn')+'">'+(g.configured?'Lista':'Pendiente de configuración')+'</strong></div><div class="status-row"><span>Región</span><strong>'+(g.region||'—')+'</strong></div><div class="status-row"><span>Perfiles</span><strong>'+profiles.length+'</strong></div><div class="status-row"><span>Autenticación</span><strong>'+(g.auth_mode||'—')+'</strong></div>';
+    $('#preview-gcp-job').disabled=!profiles.length;
     $('#submit-gcp-job').disabled=!g.configured;
   }
   async function load(){
     await loadConfig();
     if(!token()){out('Autenticación','Inicia sesión en ScientificBrain para usar las herramientas.');$('#run-nvidia-chat').disabled=true;$('#run-capability').disabled=true;return}
     const health=await api('/api/health');$('#tools-version').textContent='v'+health.version;
-    const [status,toolkit,workers,gcp,gcpSetup]=await Promise.all([api('/api/science?op=nvidia_status'),api('/api/science?op=physics_toolkit'),api('/api/science?op=physics_workers'),api('/api/science?op=gcp_batch_status'),api('/api/science?op=gcp_setup_plan')]);
-    state.status=status;state.toolkit=toolkit;state.workers=workers;state.gcp=gcp;state.gcpSetup=gcpSetup;render();
+    const requests=[
+      ['NVIDIA','/api/science?op=nvidia_status'],
+      ['Physics toolkit','/api/science?op=physics_toolkit'],
+      ['Workers','/api/science?op=physics_workers'],
+      ['Google Batch','/api/science?op=gcp_batch_status'],
+      ['Google setup','/api/science?op=gcp_setup_plan']
+    ];
+    const results=await Promise.allSettled(requests.map(([,url])=>api(url)));
+    const values=results.map((result,i)=>{
+      if(result.status==='fulfilled')return result.value;
+      out(requests[i][0]+' no disponible',result.reason?.message||String(result.reason));
+      return null;
+    });
+    state.status=values[0]||{capabilities:[]};
+    state.toolkit=values[1]||{implemented_extensions:[]};
+    state.workers=values[2]||{workers:[]};
+    state.gcp=values[3]||{};
+    state.gcpSetup=values[4]||{variables:[],workload_identity:{}};
+    render();
   }
   function num(id){const v=$(id).value.trim();return v===''?null:Number(v)}
   async function prepareJob(){
