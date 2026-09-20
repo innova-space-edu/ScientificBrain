@@ -5,7 +5,18 @@
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Centro científico · ScientificBrain</title>
   <link rel="stylesheet" href="/assets/styles.css"/>
-  <link rel="stylesheet" href="/assets/scientific_tools.css"/>
+  <link rel="stylesheet" href="/assets/scientific_tools.css?v=31-sidebar"/>
+  <style>
+    html,body{margin:0;height:100%;overflow:hidden}
+    body.science-app{display:block;background:#f6f7fb;color:#172033}
+    .science-sidebar{position:fixed;inset:0 auto 0 0;width:224px;height:100vh;background:#fff;border-right:1px solid #e6e9ef;display:flex;flex-direction:column;z-index:50}
+    .science-content{margin-left:224px;height:100vh;min-width:0;display:flex;flex-direction:column;overflow:hidden}
+    .content-topbar{flex:0 0 68px;min-height:68px;background:#fff;border-bottom:1px solid #e6e9ef}
+    .content-scroll{flex:1;min-height:0;overflow-y:auto}
+    .science-view{display:none}.science-view.active{display:block}
+    .nav-item{appearance:none;border:0!important;background:transparent!important;box-shadow:none!important}
+    @media(max-width:780px){html,body{overflow:auto}.science-sidebar{position:static;width:100%;height:auto}.science-content{margin-left:0;height:auto;min-height:100vh}.content-scroll{overflow:visible}}
+  </style>
 </head>
 <body class="science-app">
   <aside class="science-sidebar">
@@ -240,6 +251,6 @@
     </div>
   </main>
 
-  <script src="/assets/scientific_tools.js"></script>
+  <script src="/assets/scientific_tools.js?v=31-sidebar"></script>
 </body>
 </html>
