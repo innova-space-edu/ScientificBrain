@@ -12,6 +12,7 @@
     nvidiaModels: null,
     modelCatalog: null,
     lastPreparedJob: null,
+    lastBatchJobId: null,
     errors: {},
     currentView: "overview",
   };
@@ -357,6 +358,11 @@
     const hashView = location.hash.replace("#", "");
     const savedView = localStorage.getItem("scibrain_science_view");
     setView(VIEW_META[hashView] ? hashView : (VIEW_META[savedView] ? savedView : "overview"), false);
+    const savedScientificJob = localStorage.getItem("scibrain_last_scientific_job_id") || "";
+    const savedBatchJob = localStorage.getItem("scibrain_last_batch_job_id") || "";
+    if ($("#result-job-id")) $("#result-job-id").value = savedScientificJob;
+    if ($("#result-batch-job-id")) $("#result-batch-job-id").value = savedBatchJob;
+    state.lastBatchJobId = savedBatchJob || null;
 
     if (!token()) {
       $("#next-milestone").textContent = "Inicia sesión";
@@ -453,6 +459,7 @@
       const result = await api("/api/science?op=physics_prepare_job", { method: "POST", body: JSON.stringify(payload) });
       state.lastPreparedJob = result;
       $("#result-job-id").value = result.job_id || "";
+      if (result.job_id) localStorage.setItem("scibrain_last_scientific_job_id", result.job_id);
       showResult("Job científico preparado", result);
     } catch (e) { showResult("Error al preparar job", prettyError(e)); }
   }
@@ -540,16 +547,41 @@
   async function submitGcp() {
     try {
       const job = await ensurePreparedJob();
-      showResult("Job enviado a Google Cloud", await api("/api/science?op=gcp_batch_submit", {
+      const result = await api("/api/science?op=gcp_batch_submit", {
         method: "POST", body: JSON.stringify({ job }),
-      }));
+      });
+      state.lastBatchJobId = result.batch_job_id || null;
+      if (result.batch_job_id) {
+        localStorage.setItem("scibrain_last_batch_job_id", result.batch_job_id);
+        if ($("#result-batch-job-id")) $("#result-batch-job-id").value = result.batch_job_id;
+      }
+      const scientificJobId = result.scientificbrain?.job_id || job.job_id || "";
+      if (scientificJobId) {
+        localStorage.setItem("scibrain_last_scientific_job_id", scientificJobId);
+        if ($("#result-job-id")) $("#result-job-id").value = scientificJobId;
+      }
+      showResult("Job enviado a Google Cloud", result);
     } catch (e) { showResult("Error Google Cloud", prettyError(e)); }
   }
 
   async function resultJobId() {
-    const id = $("#result-job-id")?.value.trim() || state.lastPreparedJob?.job_id || "";
+    const id = $("#result-job-id")?.value.trim() || state.lastPreparedJob?.job_id || localStorage.getItem("scibrain_last_scientific_job_id") || "";
     if (!id) throw new Error("Falta ScientificBrain job ID");
     return id;
+  }
+
+  function batchJobId() {
+    const id = $("#result-batch-job-id")?.value.trim() || state.lastBatchJobId || localStorage.getItem("scibrain_last_batch_job_id") || "";
+    if (!id) throw new Error("Falta Google Batch job ID");
+    return id;
+  }
+
+  async function getBatchStatus() {
+    try {
+      const id = batchJobId();
+      const result = await api("/api/science?op=gcp_batch_get&job_id=" + encodeURIComponent(id));
+      showResult("Avance Google Batch", result);
+    } catch (e) { showResult("Error de seguimiento", prettyError(e)); }
   }
 
   async function listOutputs() {
@@ -582,6 +614,7 @@
       "#test-gcp-auth": testGcpAuth,
       "#preview-gcp-job": previewGcp,
       "#submit-gcp-job": submitGcp,
+      "#get-gcp-job-status": getBatchStatus,
       "#list-gcp-outputs": listOutputs,
       "#get-gcp-manifest": getManifest,
     };

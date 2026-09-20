@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import base64
+from datetime import datetime, timezone
 import glob
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 from urllib.parse import urlparse
@@ -71,9 +73,9 @@ def upload_tree(src: Path, uri: str) -> int:
     return count
 
 
-def run(args: list[str], cwd: Path | None = None) -> None:
+def run(args: list[str], cwd: Path | None = None, env: dict[str, str] | None = None) -> None:
     print("+", " ".join(args), flush=True)
-    subprocess.run(args, cwd=str(cwd) if cwd else None, check=True)
+    subprocess.run(args, cwd=str(cwd) if cwd else None, env=env, check=True)
 
 
 def find_warpx_binary(dimension: object) -> str:
@@ -87,6 +89,34 @@ def find_warpx_binary(dimension: object) -> str:
         if os.access(path, os.X_OK):
             return path
     raise RuntimeError("No WarpX executable found")
+
+
+_FLASH_SETUP_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.\/-]{0,159}$")
+
+
+def flash_setup_name(job: dict) -> str:
+    setup = str((job.get("parameters") or {}).get("flash_setup") or "").strip()
+    if not setup:
+        raise RuntimeError("FLASH run requires parameters.flash_setup")
+    if not _FLASH_SETUP_RE.fullmatch(setup) or any(part == ".." for part in setup.split("/")):
+        raise RuntimeError("Invalid FLASH setup name")
+    return setup
+
+
+def run_flash(job: dict) -> None:
+    if not (INPUT / "flash.par").is_file():
+        raise RuntimeError("FLASH input artifact must contain flash.par at its root")
+    run_dir = WORK / "run"
+    shutil.copytree(INPUT, run_dir, dirs_exist_ok=True)
+    executable = WORK / "flash4"
+    build_env = os.environ.copy()
+    build_env["SCIBRAIN_FLASH_BUILD_OUTPUT"] = str(executable)
+    run(["/usr/local/bin/scibrain-flash-build", flash_setup_name(job)], WORK, env=build_env)
+    if not executable.is_file() or not os.access(executable, os.X_OK):
+        raise RuntimeError("FLASH build did not produce an executable")
+    ranks = max(1, int(os.environ.get("SCIBRAIN_MPI_RANKS", "1")))
+    run(["mpirun", "--allow-run-as-root", "-np", str(ranks), str(executable)], run_dir)
+    shutil.copytree(run_dir, OUTPUT / "flash", dirs_exist_ok=True)
 
 
 def run_warpx(job: dict) -> None:
@@ -149,15 +179,43 @@ def validate_flash() -> None:
     shutil.copy2("/tmp/flash-setup-help.txt", OUTPUT / "flash-setup-help.txt")
 
 
-def write_manifest(job: dict, solver: str) -> None:
+def write_manifest(
+    job: dict,
+    solver: str,
+    *,
+    started_at: str,
+    finished_at: str,
+    execution_mode: str,
+) -> None:
     manifest = {
-        "schema_version": "0.1",
+        "schema_version": "0.2",
         "scientificbrain_job_id": job.get("job_id") or os.environ.get("SCIBRAIN_JOB_ID"),
         "solver": solver,
         "action": job.get("action") or os.environ.get("SCIBRAIN_ACTION"),
         "model": job.get("model"),
-        "image_smoke_only": solver in {"geant4", "physicsnemo", "flash"}
+        "execution": {
+            "state": "completed",
+            "mode": execution_mode,
+            "started_at": started_at,
+            "finished_at": finished_at,
+            "mpi_ranks": int(os.environ.get("SCIBRAIN_MPI_RANKS", "1")),
+        },
+        "scientific_validation": {
+            "state": "not_evaluated",
+            "required_checks": list(job.get("validation") or []),
+            "note": "Solver completion is not equivalent to scientific validation.",
+        },
+        "reproducibility": {
+            "source_version": job.get("source_version"),
+            "input_artifact": job.get("input_artifact"),
+            "random_seed": job.get("random_seed"),
+            "parameters": job.get("parameters") or {},
+        },
+        "image_smoke_only": execution_mode == "smoke",
     }
+    (OUTPUT / "scientificbrain-job.json").write_text(
+        json.dumps(job, indent=2), encoding="utf-8"
+    )
     (OUTPUT / "scientificbrain-output.json").write_text(
         json.dumps(manifest, indent=2), encoding="utf-8"
     )
@@ -168,10 +226,13 @@ def main() -> int:
     OUTPUT.mkdir(parents=True, exist_ok=True)
     job = job_payload()
     solver = str(job.get("solver") or os.environ.get("SCIBRAIN_SOLVER") or "").lower()
+    action = str(job.get("action") or os.environ.get("SCIBRAIN_ACTION") or "").lower()
     input_uri = os.environ.get("SCIBRAIN_INPUT_URI", "")
     output_uri = os.environ.get("SCIBRAIN_OUTPUT_URI", "")
     downloaded = download_prefix(input_uri, INPUT) if input_uri else 0
-    print(f"ScientificBrain runner: solver={solver} downloaded={downloaded}", flush=True)
+    started_at = datetime.now(timezone.utc).isoformat()
+    execution_mode = "full"
+    print(f"ScientificBrain runner: solver={solver} action={action} downloaded={downloaded}", flush=True)
 
     if solver == "warpx" and downloaded:
         run_warpx(job)
@@ -180,15 +241,21 @@ def main() -> int:
     elif solver == "edipic2d" and downloaded:
         run_edipic(job)
     elif solver == "geant4":
+        execution_mode = "smoke"
         validate_geant4()
     elif solver == "physicsnemo":
+        execution_mode = "smoke"
         validate_physicsnemo()
-    elif solver == "flash":
+    elif solver == "flash" and action == "validate":
+        execution_mode = "smoke"
         validate_flash()
+    elif solver == "flash" and action == "run" and downloaded:
+        run_flash(job)
     else:
-        raise RuntimeError(f"Unsupported solver or missing input artifact: {solver}")
+        raise RuntimeError(f"Unsupported solver/action or missing input artifact: {solver}/{action}")
 
-    write_manifest(job, solver)
+    finished_at = datetime.now(timezone.utc).isoformat()
+    write_manifest(job, solver, started_at=started_at, finished_at=finished_at, execution_mode=execution_mode)
     uploaded = upload_tree(OUTPUT, output_uri) if output_uri else 0
     print(f"ScientificBrain runner complete: uploaded={uploaded}", flush=True)
     return 0

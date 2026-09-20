@@ -32,6 +32,8 @@ _ACTIONS: dict[str, set[str]] = {
     "physicsnemo": {"validate", "train", "infer", "analyze"},
 }
 
+_FLASH_SETUP_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.\/-]{0,159}$")
+
 
 def physics_model_catalog() -> dict[str, Any]:
     return {
@@ -168,6 +170,12 @@ class PhysicsJob(BaseModel):
             raise ValueError(f"action {self.action} is not allowed for solver {self.solver}")
         _assert_safe_mapping(self.parameters, "parameters")
         _assert_safe_mapping(self.metadata, "metadata")
+        if self.solver == "flash" and self.action in {"run", "sweep"}:
+            setup = str(self.parameters.get("flash_setup") or "").strip()
+            if not setup:
+                raise ValueError("FLASH run/sweep requires parameters.flash_setup")
+            if not _FLASH_SETUP_RE.fullmatch(setup) or any(part == ".." for part in setup.split("/")):
+                raise ValueError("parameters.flash_setup must be a relative FLASH setup name")
         return self
 
 
@@ -254,6 +262,21 @@ def prepare_physics_job(payload: dict[str, Any]) -> dict[str, Any]:
     data = job.model_dump(mode="json")
     data["execution_profile"] = profile
     data["dispatch_state"] = "prepared"
+    data["execution_state"] = "prepared"
+    required_checks = list(job.validation) or list(profile["recommended_validation"])
+    data["validation"] = required_checks
+    data["scientific_validation"] = {
+        "state": "not_evaluated",
+        "required_checks": required_checks,
+        "note": "Preparing or finishing a solver job does not by itself validate the scientific result.",
+    }
+    data["reproducibility"] = {
+        "source_version": job.source_version,
+        "input_artifact": job.input_artifact,
+        "random_seed": job.random_seed,
+        "solver": job.solver,
+        "model": job.model,
+    }
     data["dispatch_note"] = (
         "Prepared only. ScientificBrain must submit this manifest to a server-configured "
         "worker; the client cannot supply commands, endpoints or credentials."

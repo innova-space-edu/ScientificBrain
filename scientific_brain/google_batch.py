@@ -42,6 +42,27 @@ def _json_env(name: str) -> dict[str, Any]:
     return data
 
 
+def normalize_google_batch_state(status: dict[str, Any] | None) -> dict[str, Any]:
+    raw_state = str((status or {}).get("state") or "STATE_UNSPECIFIED").upper()
+    mapping = {
+        "STATE_UNSPECIFIED": ("unknown", False, False),
+        "QUEUED": ("queued", False, False),
+        "SCHEDULED": ("preparing", False, False),
+        "RUNNING": ("running", False, False),
+        "SUCCEEDED": ("finished", True, True),
+        "FAILED": ("failed", True, False),
+        "DELETION_IN_PROGRESS": ("canceling", False, False),
+    }
+    execution_state, terminal, success = mapping.get(raw_state, ("unknown", False, False))
+    return {
+        "batch_state": raw_state,
+        "execution_state": execution_state,
+        "terminal": terminal,
+        "success": success,
+        "progress_source": "google_batch_state",
+    }
+
+
 @dataclass(frozen=True)
 class GoogleBatchProfile:
     name: str
@@ -352,6 +373,7 @@ class GoogleCloudBatch:
         )
         response.raise_for_status()
         result = response.json()
+        lifecycle = normalize_google_batch_state(result.get("status"))
         return {
             "provider": "google_cloud_batch",
             "submitted": True,
@@ -359,6 +381,7 @@ class GoogleCloudBatch:
             "name": result.get("name"),
             "uid": result.get("uid"),
             "status": result.get("status"),
+            **lifecycle,
             "scientificbrain": built["scientificbrain"],
         }
 
@@ -374,12 +397,16 @@ class GoogleCloudBatch:
         response = httpx.get(url, headers=self._headers(), timeout=self.timeout)
         response.raise_for_status()
         result = response.json()
+        status = result.get("status") or {}
+        lifecycle = normalize_google_batch_state(status)
         return {
             "provider": "google_cloud_batch",
             "job_id": job_id,
             "name": result.get("name"),
             "uid": result.get("uid"),
-            "status": result.get("status"),
+            "status": status,
+            **lifecycle,
+            "status_events": status.get("statusEvents") or [],
             "create_time": result.get("createTime"),
             "update_time": result.get("updateTime"),
             "task_groups": result.get("taskGroups"),

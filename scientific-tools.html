@@ -218,7 +218,8 @@
           <p class="panel-copy">Recupera el manifiesto y archivos generados por un job ya ejecutado. ScientificBrain limita la consulta al prefijo del job.</p>
           <div class="input-grid two-cols">
             <label>ScientificBrain job ID<input id="result-job-id" placeholder="UUID del job científico"/></label>
-            <div class="tools-actions align-end"><button id="list-gcp-outputs" class="secondary">Listar archivos</button><button id="get-gcp-manifest" class="secondary">Leer manifiesto</button></div>
+            <label>Google Batch job ID<input id="result-batch-job-id" placeholder="scibrain-flash-…"/></label>
+            <div class="tools-actions align-end"><button id="get-gcp-job-status" class="secondary">Consultar avance</button><button id="list-gcp-outputs" class="secondary">Listar archivos</button><button id="get-gcp-manifest" class="secondary">Leer manifiesto</button></div>
           </div>
         </div>
       </section>
