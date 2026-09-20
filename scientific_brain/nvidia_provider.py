@@ -157,31 +157,45 @@ class NvidiaProvider:
             user=user,
         )
 
-    def _custom_capabilities(self) -> dict[str, NvidiaCapability]:
+    def _custom_capabilities(
+        self, *, strict: bool = True
+    ) -> tuple[dict[str, NvidiaCapability], list[str]]:
         raw = _json_env("SCIBRAIN_NVIDIA_CAPABILITIES_JSON")
         result: dict[str, NvidiaCapability] = {}
+        warnings: list[str] = []
         for name, spec in raw.items():
             if not isinstance(spec, dict):
+                warnings.append(f"{name}: capability config must be an object")
+                if strict:
+                    raise ValueError(warnings[-1])
                 continue
             endpoint = str(spec.get("endpoint") or "").strip()
             if not endpoint:
+                warnings.append(f"{name}: endpoint is empty; capability ignored")
                 continue
             method = str(spec.get("method") or "POST").upper()
-            if method not in {"GET", "POST"}:
-                raise ValueError(f"Unsupported method for NVIDIA capability {name}: {method}")
             auth = str(spec.get("auth") or "nvidia").lower()
-            if auth not in {"nvidia", "ngc", "nim", "none"}:
-                raise ValueError(f"Unsupported auth mode for NVIDIA capability {name}: {auth}")
+            try:
+                if method not in {"GET", "POST"}:
+                    raise ValueError(f"unsupported method {method}")
+                if auth not in {"nvidia", "ngc", "nim", "none"}:
+                    raise ValueError(f"unsupported auth mode {auth}")
+                safe_endpoint = _safe_endpoint(endpoint)
+            except ValueError as exc:
+                warnings.append(f"{name}: {exc}")
+                if strict:
+                    raise
+                continue
             result[str(name)] = NvidiaCapability(
                 name=str(name),
                 domain=str(spec.get("domain") or "scientific"),
                 description=str(spec.get("description") or name),
-                endpoint=_safe_endpoint(endpoint),
+                endpoint=safe_endpoint,
                 method=method,
                 auth=auth,
                 enabled=bool(spec.get("enabled", True)),
             )
-        return result
+        return result, warnings
 
     def capabilities(self) -> list[dict[str, Any]]:
         caps: list[dict[str, Any]] = []
@@ -201,7 +215,8 @@ class NvidiaProvider:
                 "method": "POST",
                 "enabled": True,
             })
-        caps.extend(cap.public_dict() for cap in self._custom_capabilities().values())
+        custom, _ = self._custom_capabilities(strict=False)
+        caps.extend(cap.public_dict() for cap in custom.values())
         return caps
 
     def status(self) -> dict[str, Any]:
@@ -215,6 +230,7 @@ class NvidiaProvider:
             "local_nim_configured": self.local_nim_configured,
             "local_nim_model": self.nim_model if self.local_nim_configured else None,
             "capabilities": self.capabilities(),
+            "configuration_warnings": self._custom_capabilities(strict=False)[1],
             "physics_toolkit": physics_toolkit_manifest(),
         }
 
@@ -263,7 +279,8 @@ class NvidiaProvider:
             )
             return {"capability": capability, "provider": "nvidia-local-nim", "model": self.nim_model, "output": text}
 
-        cap = self._custom_capabilities().get(capability)
+        custom, _ = self._custom_capabilities(strict=True)
+        cap = custom.get(capability)
         if cap is None or not cap.enabled:
             raise ValueError(f"Unknown or disabled NVIDIA capability: {capability}")
         headers = {"Content-Type": "application/json", **self._auth_header(cap.auth)}
