@@ -20,6 +20,25 @@ _REQUESTED_TOKEN_TYPE = "urn:ietf:params:oauth:token-type:access_token"
 _CACHE: dict[str, tuple[str, float]] = {}
 
 
+def _read_vercel_oidc_token() -> tuple[str, str | None]:
+    token = os.getenv("VERCEL_OIDC_TOKEN", "").strip()
+    if token:
+        return token, "environment"
+    try:
+        from vercel.functions import get_env  # type: ignore
+
+        env = get_env()
+        if isinstance(env, dict):
+            token = str(env.get("VERCEL_OIDC_TOKEN") or "").strip()
+        else:
+            token = str(getattr(env, "VERCEL_OIDC_TOKEN", "") or "").strip()
+        if token:
+            return token, "vercel.functions.get_env"
+    except Exception:
+        pass
+    return "", None
+
+
 @dataclass(frozen=True)
 class AccessTokenCredentials:
     token: str
@@ -32,10 +51,12 @@ class VercelWorkloadIdentity:
     provider_id: str
     dispatcher_service_account: str
     subject_token: str
+    subject_token_source: str | None = None
     timeout: float = 20.0
 
     @classmethod
     def from_env(cls) -> "VercelWorkloadIdentity":
+        subject_token, token_source = _read_vercel_oidc_token()
         return cls(
             project_number=os.getenv("SCIBRAIN_GCP_PROJECT_NUMBER", "").strip(),
             pool_id=os.getenv("SCIBRAIN_GCP_WIF_POOL_ID", "").strip(),
@@ -43,7 +64,8 @@ class VercelWorkloadIdentity:
             dispatcher_service_account=os.getenv(
                 "SCIBRAIN_GCP_DISPATCHER_SERVICE_ACCOUNT", ""
             ).strip(),
-            subject_token=os.getenv("VERCEL_OIDC_TOKEN", "").strip(),
+            subject_token=subject_token,
+            subject_token_source=token_source,
             timeout=max(5.0, float(os.getenv("SCIBRAIN_GCP_WIF_TIMEOUT_SECONDS", "20"))),
         )
 
@@ -84,6 +106,7 @@ class VercelWorkloadIdentity:
         return {
             "configured": self.configured,
             "oidc_token_available": bool(self.subject_token),
+            "oidc_token_source": self.subject_token_source,
             "available": self.available,
             "project_number_configured": bool(self.project_number),
             "pool_id": self.pool_id or None,

@@ -472,6 +472,25 @@ On Vercel, Google authentication no longer silently falls back to Application De
 
 Google Batch preview is disabled until at least one solver execution profile exists.
 
+## Scientific Tools sidebar workspace — v0.31
+
+The Scientific Tools interface now uses a fixed navigation sidebar with one focused workspace visible at a time:
+
+- Summary;
+- Physics Router;
+- Monte Carlo / UQ;
+- NVIDIA;
+- Prepare Simulation;
+- Solvers;
+- Google Cloud;
+- Results;
+- Physics Skills;
+- Diagnostics.
+
+Provider warnings and raw technical output are no longer mixed into the normal workflow. Google Cloud setup is isolated in its own view, simulator cards distinguish scientific readiness from cloud-image readiness, and result JSON is shown only when a tool is executed.
+
+Vercel OIDC retrieval also checks both the standard `VERCEL_OIDC_TOKEN` runtime variable and the Python `vercel.functions.get_env()` system-environment accessor before reporting a missing token.
+
 ## Development
 
 ```bash

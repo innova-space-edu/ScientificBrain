@@ -4,6 +4,8 @@ import json
 import os
 from typing import Any
 
+from .google_wif import vercel_wif_from_env
+
 
 def google_cloud_setup_plan() -> dict[str, Any]:
     project_id = os.getenv("SCIBRAIN_GCP_PROJECT_ID", "").strip()
@@ -44,14 +46,13 @@ def google_cloud_setup_plan() -> dict[str, Any]:
             "description": "Server-only solver to private image and machine/GPU mapping.",
         },
     ]
+    wif = vercel_wif_from_env()
     wif_fields = {
-        "project_number": bool(os.getenv("SCIBRAIN_GCP_PROJECT_NUMBER", "").strip()),
-        "pool_id": bool(os.getenv("SCIBRAIN_GCP_WIF_POOL_ID", "").strip()),
-        "provider_id": bool(os.getenv("SCIBRAIN_GCP_WIF_PROVIDER_ID", "").strip()),
-        "dispatcher_service_account": bool(
-            os.getenv("SCIBRAIN_GCP_DISPATCHER_SERVICE_ACCOUNT", "").strip()
-        ),
-        "vercel_oidc_token": bool(os.getenv("VERCEL_OIDC_TOKEN", "").strip()),
+        "project_number": bool(wif.project_number),
+        "pool_id": bool(wif.pool_id),
+        "provider_id": bool(wif.provider_id),
+        "dispatcher_service_account": bool(wif.dispatcher_service_account),
+        "vercel_oidc_token": bool(wif.subject_token),
     }
 
     return {
@@ -72,6 +73,7 @@ def google_cloud_setup_plan() -> dict[str, Any]:
             ),
             "available": all(wif_fields.values()),
             "fields": wif_fields,
+            "token_source": wif.subject_token_source,
             "expected_vercel_subject": (
                 f"owner:{os.getenv('SCIBRAIN_VERCEL_TEAM', '').strip()}:"
                 f"project:{os.getenv('SCIBRAIN_VERCEL_PROJECT', '').strip()}:"
