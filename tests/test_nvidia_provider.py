@@ -80,3 +80,21 @@ def test_hosted_complete_uses_openai_compatible_endpoint(monkeypatch):
     assert provider.complete("system", "question") == "physics response"
     assert captured["url"].endswith("/v1/chat/completions")
     assert captured["headers"]["Authorization"] == "Bearer nvapi-test"
+
+
+def test_status_ignores_invalid_custom_endpoint(monkeypatch):
+    _clear(monkeypatch)
+    monkeypatch.setenv(
+        "SCIBRAIN_NVIDIA_CAPABILITIES_JSON",
+        json.dumps({
+            "broken": {
+                "domain": "physics",
+                "endpoint": "PLACEHOLDER",
+                "auth": "nvidia",
+            }
+        }),
+    )
+    status = NvidiaProvider.from_env().status()
+    assert status["capabilities"] == []
+    assert status["configuration_warnings"]
+    assert "broken" in status["configuration_warnings"][0]
