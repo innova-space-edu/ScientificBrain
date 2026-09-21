@@ -46,6 +46,13 @@ class handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", "0"))
         return json.loads(self.rfile.read(length) or b"{}")
 
+    def _google_batch(self):
+        token = str(self.headers.get("x-vercel-oidc-token", "") or "").strip()
+        return google_batch_from_env(
+            vercel_oidc_token=token or None,
+            vercel_oidc_token_source="request_header" if token else None,
+        )
+
     def _graph_service(self, user, folder_id: str, provider=None) -> ScientificGraphService:
         return ScientificGraphService(
             snapshot_store=UserSnapshotStore(user, folder_id=folder_id),
@@ -87,10 +94,10 @@ class handler(BaseHTTPRequestHandler):
                 self._write(200, nvidia_provider_from_env().models_status())
                 return
             if op == "gcp_batch_status":
-                self._write(200, google_batch_from_env().status())
+                self._write(200, self._google_batch().status())
                 return
             if op == "gcp_auth_probe":
-                self._write(200, google_batch_from_env().auth_probe())
+                self._write(200, self._google_batch().auth_probe())
                 return
             if op == "gcp_setup_plan":
                 self._write(200, google_cloud_setup_plan())
@@ -99,19 +106,19 @@ class handler(BaseHTTPRequestHandler):
                 job_id = str((query.get("job_id") or [""])[0]).strip()
                 if not job_id:
                     raise ValueError("job_id is required")
-                self._write(200, google_batch_from_env().get(job_id))
+                self._write(200, self._google_batch().get(job_id))
                 return
             if op == "gcp_output_list":
                 scientific_job_id = str((query.get("scientific_job_id") or [""])[0]).strip()
                 if not scientific_job_id:
                     raise ValueError("scientific_job_id is required")
-                self._write(200, google_batch_from_env().list_outputs(scientific_job_id))
+                self._write(200, self._google_batch().list_outputs(scientific_job_id))
                 return
             if op == "gcp_output_manifest":
                 scientific_job_id = str((query.get("scientific_job_id") or [""])[0]).strip()
                 if not scientific_job_id:
                     raise ValueError("scientific_job_id is required")
-                self._write(200, google_batch_from_env().output_manifest(scientific_job_id))
+                self._write(200, self._google_batch().output_manifest(scientific_job_id))
                 return
             folder_id = (query.get("folder_id") or [""])[0]
             if not folder_id:
@@ -157,19 +164,19 @@ class handler(BaseHTTPRequestHandler):
                 job = payload.get("job") or {}
                 if not isinstance(job, dict):
                     raise ValueError("job must be a JSON object")
-                self._write(200, google_batch_from_env().build_job(job))
+                self._write(200, self._google_batch().build_job(job))
                 return
             if op == "gcp_batch_submit":
                 job = payload.get("job") or {}
                 if not isinstance(job, dict):
                     raise ValueError("job must be a JSON object")
-                self._write(202, google_batch_from_env().submit(job))
+                self._write(202, self._google_batch().submit(job))
                 return
             if op == "gcp_batch_delete":
                 job_id = str(payload.get("job_id") or "").strip()
                 if not job_id:
                     raise ValueError("job_id is required")
-                self._write(202, google_batch_from_env().delete(job_id))
+                self._write(202, self._google_batch().delete(job_id))
                 return
             if op == "physics_prepare_job":
                 self._write(200, prepare_physics_job(payload))

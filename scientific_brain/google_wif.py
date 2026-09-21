@@ -20,7 +20,13 @@ _REQUESTED_TOKEN_TYPE = "urn:ietf:params:oauth:token-type:access_token"
 _CACHE: dict[str, tuple[str, float]] = {}
 
 
-def _read_vercel_oidc_token() -> tuple[str, str | None]:
+def _read_vercel_oidc_token(
+    subject_token: str | None = None,
+    subject_token_source: str | None = None,
+) -> tuple[str, str | None]:
+    token = str(subject_token or "").strip()
+    if token:
+        return token, subject_token_source or "explicit"
     token = os.getenv("VERCEL_OIDC_TOKEN", "").strip()
     if token:
         return token, "environment"
@@ -55,8 +61,15 @@ class VercelWorkloadIdentity:
     timeout: float = 20.0
 
     @classmethod
-    def from_env(cls) -> "VercelWorkloadIdentity":
-        subject_token, token_source = _read_vercel_oidc_token()
+    def from_env(
+        cls,
+        *,
+        subject_token: str | None = None,
+        subject_token_source: str | None = None,
+    ) -> "VercelWorkloadIdentity":
+        subject_token, token_source = _read_vercel_oidc_token(
+            subject_token, subject_token_source
+        )
         return cls(
             project_number=os.getenv("SCIBRAIN_GCP_PROJECT_NUMBER", "").strip(),
             pool_id=os.getenv("SCIBRAIN_GCP_WIF_POOL_ID", "").strip(),
@@ -198,5 +211,12 @@ class VercelWorkloadIdentity:
         return AccessTokenCredentials(token=access_token)
 
 
-def vercel_wif_from_env() -> VercelWorkloadIdentity:
-    return VercelWorkloadIdentity.from_env()
+def vercel_wif_from_env(
+    *,
+    subject_token: str | None = None,
+    subject_token_source: str | None = None,
+) -> VercelWorkloadIdentity:
+    return VercelWorkloadIdentity.from_env(
+        subject_token=subject_token,
+        subject_token_source=subject_token_source,
+    )

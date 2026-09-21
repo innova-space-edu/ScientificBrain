@@ -113,9 +113,16 @@ class GoogleCloudBatch:
     profiles: dict[str, GoogleBatchProfile]
     enabled: bool = False
     timeout: float = 30.0
+    vercel_oidc_token: str = ""
+    vercel_oidc_token_source: str | None = None
 
     @classmethod
-    def from_env(cls) -> "GoogleCloudBatch":
+    def from_env(
+        cls,
+        *,
+        vercel_oidc_token: str | None = None,
+        vercel_oidc_token_source: str | None = None,
+    ) -> "GoogleCloudBatch":
         raw_profiles = _json_env("SCIBRAIN_GCP_BATCH_PROFILES_JSON")
         profiles = {
             str(name): GoogleBatchProfile.from_dict(str(name), spec)
@@ -130,6 +137,8 @@ class GoogleCloudBatch:
             profiles=profiles,
             enabled=_truthy("SCIBRAIN_GCP_BATCH_ENABLED", False),
             timeout=max(5.0, float(os.getenv("SCIBRAIN_GCP_BATCH_TIMEOUT_SECONDS", "30"))),
+            vercel_oidc_token=str(vercel_oidc_token or "").strip(),
+            vercel_oidc_token_source=vercel_oidc_token_source,
         )
 
     @property
@@ -142,8 +151,14 @@ class GoogleCloudBatch:
             and self.profiles
         )
 
+    def _wif(self):
+        return vercel_wif_from_env(
+            subject_token=self.vercel_oidc_token or None,
+            subject_token_source=self.vercel_oidc_token_source,
+        )
+
     def auth_mode(self) -> str:
-        wif = vercel_wif_from_env()
+        wif = self._wif()
         on_vercel = os.getenv("VERCEL", "").strip() == "1"
         if wif.available:
             return "vercel_oidc_wif"
@@ -167,7 +182,7 @@ class GoogleCloudBatch:
             "artifact_bucket_configured": bool(self.artifact_bucket),
             "job_service_account_configured": bool(self.job_service_account),
             "auth_mode": self.auth_mode(),
-            "workload_identity": vercel_wif_from_env().public_status(),
+            "workload_identity": self._wif().public_status(),
             "profiles": [profile.public_dict() for profile in self.profiles.values()],
             "notes": [
                 "Google Cloud Batch provisions Compute Engine resources for submitted jobs.",
@@ -177,15 +192,15 @@ class GoogleCloudBatch:
         }
 
     def _credentials(self):
-        wif = vercel_wif_from_env()
+        wif = self._wif()
         on_vercel = os.getenv("VERCEL", "").strip() == "1"
         if wif.available:
             return wif.credentials()
         if wif.configured and on_vercel:
             raise RuntimeError(
-                "Google WIF is configured but VERCEL_OIDC_TOKEN is unavailable. "
-                "Enable Secure Backend Access with OIDC Federation, ensure Vercel system "
-                "environment variables are exposed, and redeploy production."
+                "Google WIF is configured but VERCEL_OIDC_TOKEN / x-vercel-oidc-token is unavailable. "
+                "Enable Secure Backend Access with OIDC Federation and ensure the function request "
+                "contains x-vercel-oidc-token, then redeploy production."
             )
         if on_vercel and not wif.configured:
             missing = ", ".join(wif.missing_configuration())
@@ -347,14 +362,14 @@ class GoogleCloudBatch:
                 "provider": "google_cloud",
                 "authenticated": bool(getattr(credentials, "token", "")),
                 "auth_mode": self.auth_mode(),
-                "workload_identity": vercel_wif_from_env().public_status(),
+                "workload_identity": self._wif().public_status(),
             }
         except Exception as exc:
             return {
                 "provider": "google_cloud",
                 "authenticated": False,
                 "auth_mode": self.auth_mode(),
-                "workload_identity": vercel_wif_from_env().public_status(),
+                "workload_identity": self._wif().public_status(),
                 "error": type(exc).__name__,
                 "detail": str(exc),
             }
@@ -491,5 +506,12 @@ class GoogleCloudBatch:
         }
 
 
-def google_batch_from_env() -> GoogleCloudBatch:
-    return GoogleCloudBatch.from_env()
+def google_batch_from_env(
+    *,
+    vercel_oidc_token: str | None = None,
+    vercel_oidc_token_source: str | None = None,
+) -> GoogleCloudBatch:
+    return GoogleCloudBatch.from_env(
+        vercel_oidc_token=vercel_oidc_token,
+        vercel_oidc_token_source=vercel_oidc_token_source,
+    )
