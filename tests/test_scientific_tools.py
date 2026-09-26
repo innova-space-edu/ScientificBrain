@@ -8,10 +8,17 @@ from scientific_brain.physics_jobs import physics_model_catalog, prepare_physics
 def test_scientific_tools_manifest_exposes_expanded_physics_stack():
     manifest = physics_toolkit_manifest()
     assert manifest["repository"].endswith("scientificbrain-physics-skills")
-    assert len(manifest["skills"]) == 39
+    assert manifest["version"] == "0.3.0"
+    assert len(manifest["skills"]) == 44
     assert "flash-physicsnemo-pipeline" in manifest["skills"]
     assert "scientificbrain-orchestration" in manifest["skills"]
+    assert "physics-model-router" in manifest["skills"]
+    assert "physics-literature" in manifest["skills"]
+    assert "physics-validator" in manifest["skills"]
+    assert "simulation-orchestrator" in manifest["skills"]
+    assert "workflow-skill-creator" in manifest["skills"]
     assert "distributed simulation/training" in manifest["implemented_extensions"]
+    assert "unit/workflow/capability evaluation contracts" in manifest["implemented_extensions"]
     assert manifest["source_grounded"] is True
 
 
