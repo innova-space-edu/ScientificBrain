@@ -11,12 +11,18 @@ from scientific_brain.physics_tools import (
 )
 
 
-def test_manifest_has_39_source_grounded_skills():
+def test_manifest_has_44_source_grounded_skills():
     manifest = physics_toolkit_manifest()
-    assert len(manifest["skills"]) == 39
+    assert len(manifest["skills"]) == 44
     assert manifest["source_grounded"] is True
     assert "PIC/hybrid routing" in manifest["implemented_extensions"]
     assert "Monte Carlo / MCC / DSMC" in manifest["implemented_extensions"]
+    assert "physics-model-router" in manifest["skills"]
+    assert "physics-validator" in manifest["skills"]
+    assert "simulation-orchestrator" in manifest["skills"]
+    assert "workflow-skill-creator" in manifest["skills"]
+    assert "physics-literature" in manifest["skills"]
+    assert manifest["version"] == "0.3.0"
 
 
 def test_router_keeps_fluid_baseline_and_can_escalate_to_pic():
