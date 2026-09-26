@@ -3,6 +3,7 @@ import pytest
 from scientific_brain.google_batch import normalize_google_batch_state
 from scientific_brain.nvidia_provider import physics_toolkit_manifest
 from scientific_brain.physics_jobs import physics_model_catalog, prepare_physics_job
+from scientific_brain.physics_tools import route_physics_model, validate_physics_observables
 
 
 def test_scientific_tools_manifest_exposes_expanded_physics_stack():
@@ -61,3 +62,26 @@ def test_google_batch_lifecycle_is_normalized_without_fake_percentage():
     assert finished["execution_state"] == "finished"
     assert finished["terminal"] is True
     assert finished["success"] is True
+
+
+def test_scientific_tools_high_level_router_contract():
+    result = route_physics_model({
+        "domain": "particle-transport",
+        "observable": "energy deposition",
+        "acceptance_criterion": "uncertainty below 5%",
+        "particle_through_matter": True,
+    })
+    assert result["schema_version"] == "0.3"
+    assert result["next_skill"] == "simulation-orchestrator"
+
+
+def test_scientific_tools_validation_contract_never_claims_global_validity():
+    result = validate_physics_observables({
+        "observables": [{
+            "name": "dose",
+            "required_checks": ["benchmark"],
+            "checks": {"benchmark": {"status": "pass", "evidence": "validated reference"}},
+        }]
+    })
+    assert result["global_validity_claim"] is False
+    assert result["skill"] == "physics-validator"

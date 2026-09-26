@@ -16,8 +16,10 @@ from scientific_brain.physics_jobs import physics_execution_profiles, physics_mo
 from scientific_brain.physics_tools import (
     monte_carlo_samples,
     physics_worker_status,
+    route_physics_model,
     route_plasma_model,
     submit_physics_job,
+    validate_physics_observables,
 )
 from scientific_brain.providers import provider_from_env
 from scientific_brain.stage_stepper import StageStepper
@@ -183,6 +185,12 @@ class handler(BaseHTTPRequestHandler):
                 return
             if op == "physics_route":
                 self._write(200, route_plasma_model(payload))
+                return
+            if op == "physics_model_route":
+                self._write(200, route_physics_model(payload))
+                return
+            if op == "physics_validate":
+                self._write(200, validate_physics_observables(payload))
                 return
             if op == "physics_monte_carlo":
                 self._write(200, monte_carlo_samples(payload))
