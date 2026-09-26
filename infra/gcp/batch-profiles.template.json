@@ -1,41 +1,47 @@
 {
   "flash": {
-    "image_uri": "REGION-docker.pkg.dev/PROJECT_ID/scientificbrain-solvers/flash-private:4.8",
+    "image_uri": "REGION-docker.pkg.dev/PROJECT_ID/scientificbrain-solvers/flash:4.8-private",
     "machine_type": "c3-standard-22",
+    "supports_multi_node": false,
     "max_retry_count": 1
   },
   "warpx": {
-    "image_uri": "REGION-docker.pkg.dev/PROJECT_ID/scientificbrain-solvers/warpx:VERSION",
+    "image_uri": "REGION-docker.pkg.dev/PROJECT_ID/scientificbrain-solvers/warpx:26.09-cuda12.8",
     "machine_type": "g2-standard-8",
     "gpu_type": "nvidia-l4",
     "max_gpus_per_node": 1,
     "install_gpu_drivers": true,
+    "supports_multi_node": false,
     "max_retry_count": 1
   },
   "picongpu": {
-    "image_uri": "REGION-docker.pkg.dev/PROJECT_ID/scientificbrain-solvers/picongpu:VERSION",
+    "image_uri": "REGION-docker.pkg.dev/PROJECT_ID/scientificbrain-solvers/picongpu:0.8.0-cuda12.4",
     "machine_type": "g2-standard-8",
     "gpu_type": "nvidia-l4",
     "max_gpus_per_node": 1,
     "install_gpu_drivers": true,
+    "supports_multi_node": false,
     "max_retry_count": 1
   },
   "edipic2d": {
-    "image_uri": "REGION-docker.pkg.dev/PROJECT_ID/scientificbrain-solvers/edipic2d:VERSION",
+    "image_uri": "REGION-docker.pkg.dev/PROJECT_ID/scientificbrain-solvers/edipic2d:a32863ad-petsc3.14.6",
     "machine_type": "c3-standard-8",
+    "supports_multi_node": false,
     "max_retry_count": 1
   },
   "geant4": {
     "image_uri": "REGION-docker.pkg.dev/PROJECT_ID/scientificbrain-solvers/geant4:11.4.2",
     "machine_type": "c3-standard-8",
+    "supports_multi_node": false,
     "max_retry_count": 1
   },
   "physicsnemo": {
-    "image_uri": "REGION-docker.pkg.dev/PROJECT_ID/scientificbrain-solvers/physicsnemo:2.2.2",
+    "image_uri": "REGION-docker.pkg.dev/PROJECT_ID/scientificbrain-solvers/physicsnemo:26.08",
     "machine_type": "g2-standard-8",
     "gpu_type": "nvidia-l4",
     "max_gpus_per_node": 1,
     "install_gpu_drivers": true,
+    "supports_multi_node": false,
     "max_retry_count": 1
   }
 }

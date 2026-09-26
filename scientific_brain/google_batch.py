@@ -16,6 +16,7 @@ import httpx
 
 from .physics_jobs import PhysicsJob
 from .google_wif import vercel_wif_from_env
+from .solver_registry import DEFAULT_ARTIFACT_REPOSITORY, default_batch_profiles
 
 
 BATCH_SCOPE = "https://www.googleapis.com/auth/cloud-platform"
@@ -72,6 +73,7 @@ class GoogleBatchProfile:
     install_gpu_drivers: bool = False
     max_gpus_per_node: int | None = None
     block_external_network: bool = False
+    supports_multi_node: bool = False
     max_retry_count: int = 1
     spot: bool = False
 
@@ -90,6 +92,7 @@ class GoogleBatchProfile:
             install_gpu_drivers=bool(data.get("install_gpu_drivers", bool(data.get("gpu_type")))),
             max_gpus_per_node=int(max_gpus) if max_gpus not in (None, "") else None,
             block_external_network=bool(data.get("block_external_network", False)),
+            supports_multi_node=bool(data.get("supports_multi_node", False)),
             max_retry_count=max(0, min(10, int(data.get("max_retry_count", 1)))),
             spot=bool(data.get("spot", False)),
         )
@@ -100,6 +103,7 @@ class GoogleBatchProfile:
             "machine_type": self.machine_type,
             "gpu_type": self.gpu_type,
             "max_gpus_per_node": self.max_gpus_per_node,
+            "supports_multi_node": self.supports_multi_node,
             "spot": self.spot,
         }
 
@@ -115,6 +119,7 @@ class GoogleCloudBatch:
     timeout: float = 30.0
     vercel_oidc_token: str = ""
     vercel_oidc_token_source: str | None = None
+    profile_source: str = "environment"
 
     @classmethod
     def from_env(
@@ -123,15 +128,33 @@ class GoogleCloudBatch:
         vercel_oidc_token: str | None = None,
         vercel_oidc_token_source: str | None = None,
     ) -> "GoogleCloudBatch":
+        project_id = os.getenv("SCIBRAIN_GCP_PROJECT_ID", "").strip()
+        region = os.getenv("SCIBRAIN_GCP_REGION", "us-central1").strip() or "us-central1"
+        repository = (
+            os.getenv("SCIBRAIN_GCP_ARTIFACT_REPOSITORY", DEFAULT_ARTIFACT_REPOSITORY).strip()
+            or DEFAULT_ARTIFACT_REPOSITORY
+        )
         raw_profiles = _json_env("SCIBRAIN_GCP_BATCH_PROFILES_JSON")
+        profile_source = "environment"
+        if (
+            not raw_profiles
+            and project_id
+            and _truthy("SCIBRAIN_GCP_BATCH_AUTOCONFIGURE", True)
+        ):
+            raw_profiles = default_batch_profiles(
+                project_id,
+                region=region,
+                repository=repository,
+            )
+            profile_source = "solver_registry"
         profiles = {
             str(name): GoogleBatchProfile.from_dict(str(name), spec)
             for name, spec in raw_profiles.items()
             if isinstance(spec, dict)
         }
         return cls(
-            project_id=os.getenv("SCIBRAIN_GCP_PROJECT_ID", "").strip(),
-            region=os.getenv("SCIBRAIN_GCP_REGION", "us-central1").strip() or "us-central1",
+            project_id=project_id,
+            region=region,
             artifact_bucket=os.getenv("SCIBRAIN_GCP_ARTIFACT_BUCKET", "").strip(),
             job_service_account=os.getenv("SCIBRAIN_GCP_JOB_SERVICE_ACCOUNT", "").strip() or None,
             profiles=profiles,
@@ -139,6 +162,7 @@ class GoogleCloudBatch:
             timeout=max(5.0, float(os.getenv("SCIBRAIN_GCP_BATCH_TIMEOUT_SECONDS", "30"))),
             vercel_oidc_token=str(vercel_oidc_token or "").strip(),
             vercel_oidc_token_source=vercel_oidc_token_source,
+            profile_source=profile_source,
         )
 
     @property
@@ -184,7 +208,9 @@ class GoogleCloudBatch:
             "auth_mode": self.auth_mode(),
             "workload_identity": self._wif().public_status(),
             "profiles": [profile.public_dict() for profile in self.profiles.values()],
+            "profile_source": self.profile_source,
             "notes": [
+                "Profile configuration does not prove that the referenced Artifact Registry image exists.",
                 "Google Cloud Batch provisions Compute Engine resources for submitted jobs.",
                 "GPU jobs require a server-configured compatible machine/GPU profile.",
                 "Credentials, container images and service accounts are server-owned.",
@@ -253,6 +279,13 @@ class GoogleCloudBatch:
         nodes = job.resources.nodes
         if nodes < 1:
             raise ValueError("nodes must be >= 1")
+        if nodes > 1 and not profile.supports_multi_node:
+            raise ValueError(
+                f"Google Batch profile {profile.name} is single-node; "
+                "use a dedicated validated cross-VM MPI profile"
+            )
+        if profile.gpu_type and job.resources.gpus < 1:
+            raise ValueError(f"Google Batch profile {profile.name} requires at least one GPU")
         if job.resources.gpus and not profile.gpu_type:
             raise ValueError(f"Google Batch profile {profile.name} has no gpu_type")
         if job.resources.gpus % nodes != 0:
@@ -276,6 +309,7 @@ class GoogleCloudBatch:
             "SCIBRAIN_OUTPUT_URI": output_uri,
             "SCIBRAIN_SOLVER": job.solver,
             "SCIBRAIN_ACTION": job.action,
+            "SCIBRAIN_MODEL": job.model,
             "SCIBRAIN_JOB_ID": job.job_id,
             "SCIBRAIN_MPI_RANKS": str(job.resources.mpi_ranks or nodes),
         }
