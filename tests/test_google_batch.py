@@ -66,14 +66,10 @@ def test_build_gpu_batch_job(monkeypatch):
     assert built["scientificbrain"]["input_uri"].startswith("gs://science-artifacts/")
 
 
-def test_multi_node_enables_hosts_file_and_ssh(monkeypatch):
+def test_default_profile_rejects_multi_node_until_cross_vm_mpi_is_validated(monkeypatch):
     _configured(monkeypatch)
-    built = GoogleCloudBatch.from_env().build_job(_warpx_job(nodes=2, gpus=2))
-    group = built["job"]["taskGroups"][0]
-    assert group["taskCount"] == 2
-    assert group["taskCountPerNode"] == 1
-    assert group["requireHostsFile"] is True
-    assert group["permissiveSsh"] is True
+    with pytest.raises(ValueError, match="single-node"):
+        GoogleCloudBatch.from_env().build_job(_warpx_job(nodes=2, gpus=2))
 
 
 def test_gpu_request_rejected_when_profile_has_no_gpu(monkeypatch):
