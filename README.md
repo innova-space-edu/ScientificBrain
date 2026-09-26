@@ -501,6 +501,19 @@ The NVIDIA workspace now separates API availability, active/available hosted mod
 
 Preview/Production Google WIF state is also environment-aware so a Preview clearly reports when its own Vercel variables or OIDC subject authorization are missing.
 
+## Physics Skills v0.3 runtime API
+
+The v0.3 Physics Skill contracts now have deterministic ScientificBrain runtime bindings:
+
+```text
+POST /api/science?op=physics_model_route
+POST /api/science?op=physics_validate
+```
+
+The existing `physics_route` operation remains the detailed plasma-scale router. The new `physics_model_route` sits above it and routes broader physics problems by observable/model family; `physics_validate` applies the independent observable-level validation gate. Missing required scientific evidence is returned as `blocked`, never as an implicit pass.
+
+See `docs/SCIENTIFIC_COMPUTE.md`.
+
 ## Development
 
 ```bash
