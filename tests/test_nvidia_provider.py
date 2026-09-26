@@ -33,10 +33,15 @@ def test_status_never_exposes_nvidia_keys(monkeypatch):
 
 def test_physics_toolkit_exposes_expanded_stack():
     manifest = physics_toolkit_manifest()
-    assert len(manifest["skills"]) == 39
+    assert manifest["version"] == "0.3.0"
+    assert len(manifest["skills"]) == 44
     assert "PIC/hybrid routing" in manifest["implemented_extensions"]
     assert "active learning" in manifest["implemented_extensions"]
     assert "direct ScientificBrain orchestration" in manifest["implemented_extensions"]
+    assert "physics-wide model routing" in manifest["implemented_extensions"]
+    assert "independent observable-level validation" in manifest["implemented_extensions"]
+    assert "physics-model-router" in manifest["skills"]
+    assert "physics-validator" in manifest["skills"]
 
 
 def test_custom_capability_is_server_configured(monkeypatch):

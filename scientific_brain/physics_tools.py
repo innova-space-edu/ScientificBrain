@@ -20,6 +20,8 @@ MP = 1.67262192369e-27
 MAX_MONTE_CARLO_SAMPLES = 5000
 
 PHYSICS_SKILLS = [
+    "physics-model-router",
+    "physics-literature",
     "plasma-regime",
     "plasma-dimensionless",
     "plasma-model-router",
@@ -43,6 +45,7 @@ PHYSICS_SKILLS = [
     "edipic2d-discover",
     "edipic2d-run",
     "pic-validation",
+    "physics-validator",
     "geant4-particle-transport",
     "montecarlo-uncertainty",
     "montecarlo-parameter-sampling",
@@ -57,8 +60,10 @@ PHYSICS_SKILLS = [
     "active-learning-plasma",
     "distributed-simulation",
     "multifidelity-plasma",
+    "simulation-orchestrator",
     "flash-physicsnemo-pipeline",
     "scientificbrain-orchestration",
+    "workflow-skill-creator",
 ]
 
 
@@ -82,7 +87,7 @@ def _positive(payload: dict[str, Any], name: str, default: float | None = None) 
 def physics_toolkit_manifest() -> dict[str, Any]:
     return {
         "name": "ScientificBrain Physics Skills",
-        "version": "0.2.1",
+        "version": "0.3.0",
         "repository": os.getenv(
             "SCIBRAIN_PHYSICS_SKILLS_REPO",
             "https://github.com/innova-space-edu/scientificbrain-physics-skills",
@@ -108,6 +113,12 @@ def physics_toolkit_manifest() -> dict[str, Any]:
             "uncertainty quantification",
             "active learning",
             "direct ScientificBrain orchestration",
+            "physics-wide model routing",
+            "physics literature evidence mapping",
+            "independent observable-level validation",
+            "simulation execution-graph orchestration",
+            "workflow-to-skill distillation",
+            "unit/workflow/capability evaluation contracts",
         ],
         "execution_model": "ScientificBrain routes heavy jobs to server-configured workers/HPC.",
     }
