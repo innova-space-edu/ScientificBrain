@@ -352,7 +352,7 @@ https://github.com/innova-space-edu/scientificbrain-physics-skills
 
 The physics-skills repository documents this ScientificBrain integration in `references/SCIENTIFICBRAIN_INTEGRATION.md`.
 
-Planned extensions preserved in the toolkit roadmap are **PIC/hybrid routing, additional diagnostics, distributed simulation/training, active learning, and direct ScientificBrain orchestration**.
+Physics Skills v0.3 additionally provides physics-wide model routing, physics literature evidence mapping, an independent observable-level validator, simulation execution-graph orchestration, workflow-to-skill distillation, and unit/workflow/capability evaluation contracts.
 
 
 ## Physics orchestration — v0.24
@@ -361,7 +361,7 @@ The Scientific Tools workspace now exposes source-grounded physics tooling indep
 
 - a local plasma model router using Debye length, electron/ion skin depths, gyro-radii, plasma beta and Alfvén Mach;
 - reproducible Monte Carlo parameter sampling;
-- the 39-skill ScientificBrain Physics Toolkit;
+- the 44-skill ScientificBrain Physics Toolkit;
 - source-grounded solver maps for FLASH, WarpX, PIConGPU, EDIPIC-2D, Geant4, PhysicsNeMo and openPMD;
 - a server-only physics worker registry for heavy solver/HPC jobs;
 - centralized NVIDIA/BioNeMo/PhysicsNeMo capabilities when the NVIDIA credential is available.
