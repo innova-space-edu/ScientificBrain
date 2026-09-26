@@ -447,13 +447,26 @@
       try { parameters = JSON.parse($("#job-parameters").value || "{}"); }
       catch { throw new Error("Parámetros JSON inválidos"); }
 
+      const solver = $("#job-solver").value;
+      let gpus = Number($("#job-gpus").value || 0);
+      if (["warpx", "picongpu", "physicsnemo"].includes(solver) && gpus < 1) {
+        gpus = 1;
+        $("#job-gpus").value = "1";
+      }
+      const gpuJob = gpus > 0;
       const payload = {
-        solver: $("#job-solver").value,
+        solver,
         action: $("#job-action").value,
         model: $("#job-model").value.trim(),
         input_artifact: $("#job-input").value.trim(),
         parameters,
-        resources: { gpus: Number($("#job-gpus").value || 0), cpus: 4, nodes: 1, memory_gb: 8, wall_minutes: 60 },
+        resources: {
+          gpus,
+          cpus: gpuJob ? 8 : 4,
+          nodes: 1,
+          memory_gb: gpuJob ? 32 : 8,
+          wall_minutes: 60,
+        },
       };
 
       const result = await api("/api/science?op=physics_prepare_job", { method: "POST", body: JSON.stringify(payload) });
