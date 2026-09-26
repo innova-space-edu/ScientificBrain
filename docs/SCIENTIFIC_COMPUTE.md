@@ -48,3 +48,25 @@ ScientificBrain itself is the orchestrator. Execution can happen on:
 - approved NVIDIA/NIM endpoints for supported AI capabilities.
 
 Vercel hosts the web/API control plane; it is not used as the heavy simulation node.
+
+
+## Physics Skills v0.3 runtime operations
+
+ScientificBrain exposes two additional authenticated deterministic operations:
+
+```text
+POST /api/science?op=physics_model_route
+POST /api/science?op=physics_validate
+```
+
+`physics_model_route` is the high-level Physics Skill router. It defines the target observable and acceptance criterion, selects the model family, delegates plasma scale screening to the existing `physics_route` path when the required plasma inputs are available, and returns unresolved information instead of silently inventing it.
+
+`physics_validate` is an observable-level validation gate. It aggregates explicit checks such as dimensions, regime validity, convergence, conservation, benchmark evidence, uncertainty and provenance into `accepted`, `conditional`, `rejected` or `blocked`. Missing required evidence is always `blocked`.
+
+The existing endpoint remains unchanged for backward compatibility:
+
+```text
+POST /api/science?op=physics_route
+```
+
+It continues to perform detailed plasma scale screening and fluid/hybrid/PIC candidate routing.
