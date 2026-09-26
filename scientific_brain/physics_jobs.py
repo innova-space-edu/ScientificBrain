@@ -24,15 +24,22 @@ _FORBIDDEN_KEYS = {
 }
 
 _ACTIONS: dict[str, set[str]] = {
-    "flash": {"validate", "run", "sweep", "analyze"},
-    "warpx": {"validate", "run", "sweep", "analyze"},
-    "picongpu": {"validate", "run", "sweep", "analyze"},
-    "edipic2d": {"validate", "run", "sweep", "analyze"},
-    "geant4": {"validate", "run", "sweep", "analyze"},
+    "flash": {"validate", "run"},
+    "warpx": {"validate", "run"},
+    "picongpu": {"validate", "run"},
+    "edipic2d": {"validate", "run"},
+    "geant4": {"validate", "run"},
     "physicsnemo": {"validate", "train", "infer", "analyze"},
 }
 
 _FLASH_SETUP_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.\/-]{0,159}$")
+_GEANT4_PHYSICS_LISTS = {
+    "FTFP_BERT",
+    "FTFP_BERT_EMZ",
+    "QGSP_BERT",
+    "QGSP_BIC",
+    "Shielding",
+}
 
 
 def physics_model_catalog() -> dict[str, Any]:
@@ -170,12 +177,28 @@ class PhysicsJob(BaseModel):
             raise ValueError(f"action {self.action} is not allowed for solver {self.solver}")
         _assert_safe_mapping(self.parameters, "parameters")
         _assert_safe_mapping(self.metadata, "metadata")
-        if self.solver == "flash" and self.action in {"run", "sweep"}:
+        if self.solver == "flash" and self.action == "run":
             setup = str(self.parameters.get("flash_setup") or "").strip()
             if not setup:
-                raise ValueError("FLASH run/sweep requires parameters.flash_setup")
+                raise ValueError("FLASH run requires parameters.flash_setup")
             if not _FLASH_SETUP_RE.fullmatch(setup) or any(part == ".." for part in setup.split("/")):
                 raise ValueError("parameters.flash_setup must be a relative FLASH setup name")
+        if (
+            self.solver == "physicsnemo"
+            and self.action in {"train", "infer", "analyze"}
+            and self.model != "fno"
+        ):
+            raise ValueError(
+                "The executable PhysicsNeMo adapter currently supports model=fno "
+                "for train/infer/analyze"
+            )
+        if self.solver == "geant4" and self.action == "run" and self.model == "custom-physics-list":
+            physics_list = str(self.parameters.get("physics_list") or "").strip()
+            if physics_list not in _GEANT4_PHYSICS_LISTS:
+                raise ValueError(
+                    "custom-physics-list requires parameters.physics_list from "
+                    "the ScientificBrain allowlist"
+                )
         return self
 
 
