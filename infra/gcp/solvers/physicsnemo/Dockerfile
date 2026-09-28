@@ -3,7 +3,7 @@ FROM nvcr.io/nvidia/physicsnemo/physicsnemo:${PHYSICSNEMO_VERSION}
 
 USER root
 RUN python3 -m pip install --no-cache-dir google-cloud-storage \
- && python3 -c "import importlib.metadata as m; print('PhysicsNeMo', m.version('physicsnemo')); print('Torch', m.version('torch'))"
+ && python3 -c "import importlib.util; spec=importlib.util.find_spec('physicsnemo'); assert spec is not None, 'physicsnemo module missing'; print('PhysicsNeMo module', spec.origin)"
 
 COPY common/scibrain_runner.py /opt/scientificbrain/runner.py
 COPY physicsnemo/scibrain_physicsnemo.py /opt/scientificbrain/physicsnemo_adapter.py

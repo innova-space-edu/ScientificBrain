@@ -161,7 +161,8 @@ def test_picongpu_image_matches_cuda_openmpi_runtime_contract():
     assert "libboost-program-options-dev" in text
     assert "libboost-atomic-dev" in text
     assert "zlib1g-dev" in text
-    assert 'pic-build -j "$(nproc)" -b "cuda:${CUDA_ARCH}"' in text
+    assert "PICONGPU_BUILD_JOBS=2" in text
+    assert 'pic-build -j "${PICONGPU_BUILD_JOBS}" -b "cuda:${CUDA_ARCH}"' in text
 
 
 def test_flash_private_archive_uses_root_setup_script():
@@ -174,7 +175,7 @@ def test_flash_private_archive_uses_root_setup_script():
 
 def test_physicsnemo_image_does_not_require_cuda_driver_during_build():
     text = (SOLVERS / "physicsnemo" / "Dockerfile").read_text()
-    assert "importlib.metadata" in text
+    assert "find_spec('physicsnemo')" in text
     assert "import physicsnemo" not in text
     assert "from physicsnemo" not in text
     assert "py_compile" in text
@@ -184,3 +185,9 @@ def test_edipic_fortran_build_is_serial():
     text = (SOLVERS / "edipic2d" / "Dockerfile").read_text()
     assert "cd src && make &&" in text
     assert 'cd src && make -j' not in text
+
+
+def test_picongpu_runtime_build_concurrency_is_memory_bounded():
+    text = (SOLVERS / "common" / "scibrain_runner.py").read_text()
+    assert 'SCIBRAIN_PICONGPU_BUILD_JOBS", "2"' in text
+    assert '["pic-build", "-j", str(build_jobs)' in text
