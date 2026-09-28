@@ -145,3 +145,20 @@ def test_static_batch_template_matches_runtime_registry():
     assert set(template) == set(profiles)
     for solver in template:
         assert template[solver]["image_uri"] == profiles[solver]["image_uri"]
+
+
+def test_warpx_image_keeps_rz_linear_algebra_dependencies():
+    text = (SOLVERS / "warpx" / "Dockerfile").read_text()
+    assert "libblaspp-dev" in text
+    assert "liblapackpp-dev" in text
+    assert '-DWarpX_DIMS="1;2;3;RZ"' in text
+
+
+def test_picongpu_image_matches_cuda_openmpi_runtime_contract():
+    text = (SOLVERS / "picongpu" / "Dockerfile").read_text()
+    assert "CUDA_IMAGE=nvidia/cuda:12.4.1-devel-ubuntu22.04" in text
+    assert "OMPI_MCA_mpi_leave_pinned=0" in text
+    assert "libboost-program-options-dev" in text
+    assert "libboost-atomic-dev" in text
+    assert "zlib1g-dev" in text
+    assert 'pic-build -j "$(nproc)" -b "cuda:${CUDA_ARCH}"' in text
