@@ -178,3 +178,9 @@ def test_physicsnemo_image_does_not_require_cuda_driver_during_build():
     assert "import physicsnemo" not in text
     assert "from physicsnemo" not in text
     assert "py_compile" in text
+
+
+def test_edipic_fortran_build_is_serial():
+    text = (SOLVERS / "edipic2d" / "Dockerfile").read_text()
+    assert "cd src && make &&" in text
+    assert 'cd src && make -j' not in text
