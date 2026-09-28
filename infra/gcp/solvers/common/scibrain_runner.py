@@ -172,7 +172,8 @@ def run_picongpu(job: dict) -> None:
     run_dir = WORK / "picongpu-input"
     shutil.copytree(INPUT, run_dir, dirs_exist_ok=True)
     cuda_arch = os.environ.get("SCIBRAIN_PICONGPU_CUDA_ARCH", "89")
-    run(["pic-build", "-b", f"cuda:{cuda_arch}"], run_dir)
+    build_jobs = max(1, min(4, int(os.environ.get("SCIBRAIN_PICONGPU_BUILD_JOBS", "2"))))
+    run(["pic-build", "-j", str(build_jobs), "-b", f"cuda:{cuda_arch}"], run_dir)
     cfg = run_dir / "etc" / "picongpu" / "1.cfg"
     tpl = run_dir / "etc" / "picongpu" / "bash" / "mpiexec.tpl"
     if not cfg.exists() or not tpl.exists():

@@ -4,6 +4,7 @@ FROM ${CUDA_IMAGE}
 ARG PICONGPU_VERSION=0.8.0
 ARG OPENPMD_VERSION=0.15.2
 ARG CUDA_ARCH=89
+ARG PICONGPU_BUILD_JOBS=2
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PICSRC=/opt/picongpu
@@ -49,7 +50,7 @@ RUN git clone --branch "${PICONGPU_VERSION}" --depth 1 --recursive \
       https://github.com/ComputationalRadiationPhysics/picongpu.git /opt/picongpu \
  && pic-create "${PIC_EXAMPLES}/LaserWakefield" /opt/picongpu-smoke \
  && cd /opt/picongpu-smoke \
- && pic-build -j "$(nproc)" -b "cuda:${CUDA_ARCH}" \
+ && pic-build -j "${PICONGPU_BUILD_JOBS}" -b "cuda:${CUDA_ARCH}" \
  && test -x /opt/picongpu-smoke/.build/picongpu
 
 RUN python3 -m pip install --no-cache-dir google-cloud-storage
