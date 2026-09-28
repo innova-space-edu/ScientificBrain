@@ -170,3 +170,11 @@ def test_flash_private_archive_uses_root_setup_script():
     assert "test -f /opt/flash/setup" in text
     assert "'./setup \"$setup_name\" -auto \"$@\"'" in text
     assert "/opt/flash/bin/setup" not in text
+
+
+def test_physicsnemo_image_does_not_require_cuda_driver_during_build():
+    text = (SOLVERS / "physicsnemo" / "Dockerfile").read_text()
+    assert "importlib.metadata" in text
+    assert "import physicsnemo" not in text
+    assert "from physicsnemo" not in text
+    assert "py_compile" in text
