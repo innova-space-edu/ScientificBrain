@@ -162,3 +162,11 @@ def test_picongpu_image_matches_cuda_openmpi_runtime_contract():
     assert "libboost-atomic-dev" in text
     assert "zlib1g-dev" in text
     assert 'pic-build -j "$(nproc)" -b "cuda:${CUDA_ARCH}"' in text
+
+
+def test_flash_private_archive_uses_root_setup_script():
+    text = (SOLVERS / "flash-private" / "Dockerfile").read_text()
+    assert "chmod 0555 /opt/flash/setup" in text
+    assert "test -f /opt/flash/setup" in text
+    assert "'./setup \"$setup_name\" -auto \"$@\"'" in text
+    assert "/opt/flash/bin/setup" not in text
